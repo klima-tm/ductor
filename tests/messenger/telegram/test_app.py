@@ -360,12 +360,14 @@ class TestOnStart:
 
         with (
             patch.object(tg_bot, "_show_welcome", new_callable=AsyncMock) as welcome,
+            patch.object(tg_bot, "_sync_user_command_scope", new_callable=AsyncMock) as sync_scope,
             patch.object(
                 tg_bot, "_send_join_notification", new_callable=AsyncMock
             ) as join_notification,
         ):
             await tg_bot._on_start(msg)
 
+        sync_scope.assert_awaited_once_with(200)
         welcome.assert_awaited_once_with(msg)
         join_notification.assert_not_awaited()
 
@@ -1352,6 +1354,25 @@ class TestSyncCommands:
         scoped = {call.kwargs["scope"].chat_id: call.args[0] for call in calls[1:]}
         assert scoped[100] == _BOT_COMMANDS
         assert scoped[200] == public_commands
+
+    async def test_role_scope_is_deferred_until_new_user_starts_bot(self) -> None:
+        from aiogram.types import BotCommandScopeChat
+
+        config = _make_config(user_ids=[100], admin_user_ids=[100])
+        tg_bot, bot_instance = _make_tg_bot(config)
+
+        async def get_commands(**kwargs: object) -> list[object]:
+            if isinstance(kwargs.get("scope"), BotCommandScopeChat):
+                raise TelegramBadRequest(method=MagicMock(), message="chat not found")
+            return []
+
+        bot_instance.get_my_commands = AsyncMock(side_effect=get_commands)
+        bot_instance.set_my_commands = AsyncMock()
+        bot_instance.delete_my_commands = AsyncMock()
+
+        await tg_bot._sync_commands()
+
+        bot_instance.set_my_commands.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------

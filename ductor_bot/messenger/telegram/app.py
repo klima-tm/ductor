@@ -787,8 +787,10 @@ class TelegramBot:
             return
         if self._config.group_mention_only and not self._is_addressed(message):
             return
-        await self._show_welcome(message)
         user_id = message.from_user.id if message.from_user else None
+        if self._roles_enabled and user_id is not None:
+            await self._sync_user_command_scope(user_id)
+        await self._show_welcome(message)
         if not self._roles_enabled or self._is_admin_user(user_id):
             await self._send_join_notification(message.chat.id)
 
@@ -1671,7 +1673,6 @@ class TelegramBot:
         from aiogram.types import (
             BotCommandScopeAllGroupChats,
             BotCommandScopeAllPrivateChats,
-            BotCommandScopeChat,
         )
 
         desired = (
@@ -1708,18 +1709,28 @@ class TelegramBot:
         # normal users see only the public Klima AI controls. Setting every
         # allowlisted user also overwrites any stale role scope after changes.
         for user_id in self._allowed_users:
-            user_scope = BotCommandScopeChat(chat_id=user_id)
-            scoped_desired = _BOT_COMMANDS if user_id in self._admin_users else desired
-            scoped_current = await self._bot.get_my_commands(scope=user_scope)
-            current_scoped_tuples = [(c.command, c.description) for c in scoped_current]
-            desired_scoped_tuples = [(c.command, c.description) for c in scoped_desired]
-            if current_scoped_tuples != desired_scoped_tuples:
-                await self._bot.set_my_commands(scoped_desired, scope=user_scope)
-                logger.info(
-                    "Updated %d bot commands for user scope %d",
-                    len(scoped_desired),
-                    user_id,
-                )
+            await self._sync_user_command_scope(user_id)
+
+    async def _sync_user_command_scope(self, user_id: int) -> None:
+        """Sync one private-chat command scope after the user has started the bot."""
+        if not self._roles_enabled:
+            return
+        from aiogram.types import BotCommandScopeChat
+
+        scope = BotCommandScopeChat(chat_id=user_id)
+        public_commands = [cmd for cmd in _BOT_COMMANDS if cmd.command in _USER_COMMAND_NAMES]
+        desired = _BOT_COMMANDS if user_id in self._admin_users else public_commands
+        try:
+            current = await self._bot.get_my_commands(scope=scope)
+            current_tuples = [(c.command, c.description) for c in current]
+            desired_tuples = [(c.command, c.description) for c in desired]
+            if current_tuples != desired_tuples:
+                await self._bot.set_my_commands(desired, scope=scope)
+                logger.info("Updated %d bot commands for user scope %d", len(desired), user_id)
+        except TelegramBadRequest as exc:
+            if "chat not found" not in str(exc).lower():
+                raise
+            logger.info("Command scope deferred until user %d starts the bot", user_id)
 
     async def _watch_restart_marker(self) -> None:
         """Poll for restart-requested marker file."""
