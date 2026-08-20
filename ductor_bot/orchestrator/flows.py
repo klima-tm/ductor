@@ -129,15 +129,16 @@ async def _prepare_normal(
     )
 
     append_prompt = None
-    if is_new:
+    if is_new or orch._config.memory_scope == "chat":
         append_prompt = await asyncio.to_thread(
             memory_system_prompt,
             orch.paths,
             key,
             orch._config.memory_scope,
-            include_content=True,
+            include_content=is_new,
         )
 
+    if is_new:
         roster = _build_agent_roster(orch)
         if roster:
             append_prompt = f"{append_prompt}\n\n{roster}" if append_prompt else roster

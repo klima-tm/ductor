@@ -96,6 +96,25 @@ async def test_normal_chat_memory_isolated_between_chats(orch: Orchestrator) -> 
     assert "first private fact" not in second_prompt
 
 
+async def test_normal_chat_scope_reasserts_boundary_on_resumed_session(
+    orch: Orchestrator,
+) -> None:
+    orch._config.memory_scope = "chat"
+    key = SessionKey.telegram(101)
+    ensure_memory_file(orch.paths, key, "chat").write_text("- private fact")
+    mock_execute = AsyncMock(return_value=_mock_response())
+    object.__setattr__(orch._cli_service, "execute", mock_execute)
+
+    await normal(orch, key, "First")
+    await normal(orch, key, "Second")
+
+    resumed = mock_execute.call_args_list[1][0][0]
+    assert resumed.resume_session is not None
+    assert resumed.append_system_prompt is not None
+    assert "PRIVATE MEMORY FOR THIS CHAT" in resumed.append_system_prompt
+    assert "private fact" not in resumed.append_system_prompt
+
+
 async def test_normal_resume_session_no_append(orch: Orchestrator) -> None:
     mock_execute = AsyncMock(return_value=_mock_response())
     object.__setattr__(orch._cli_service, "execute", mock_execute)
