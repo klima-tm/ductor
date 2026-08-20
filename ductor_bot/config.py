@@ -472,6 +472,8 @@ class AgentConfig(BaseModel):
     transports: list[str] = Field(default_factory=list)
     telegram_token: str = ""
     allowed_user_ids: list[int] = Field(default_factory=list)
+    admin_user_ids: list[int] = Field(default_factory=list)
+    public_name: str = ""
     allowed_group_ids: list[int] = Field(default_factory=list)
     allowed_channel_ids: list[int] = Field(default_factory=list)
     matrix: MatrixConfig = Field(default_factory=MatrixConfig)

@@ -276,3 +276,18 @@ async def test_streaming_auth_error_shows_hint(orch: Orchestrator) -> None:
 
     assert "Authentication failed" in result.text
     assert "/model" in result.text
+
+
+async def test_public_name_hides_runtime_model_in_error(orch: Orchestrator) -> None:
+    orch._config.public_name = "Klima AI"
+    object.__setattr__(
+        orch._cli_service,
+        "execute",
+        AsyncMock(return_value=_mock_response(is_error=True, result="429 usage limit")),
+    )
+    object.__setattr__(orch._process_registry, "kill_by_chat_topic", AsyncMock(return_value=0))
+
+    result = await normal(orch, SessionKey(chat_id=1), "Test")
+
+    assert "[Klima AI]" in result.text
+    assert "[opus]" not in result.text

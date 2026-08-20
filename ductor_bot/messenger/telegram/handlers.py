@@ -141,6 +141,7 @@ async def handle_new_session(
     bot: Bot,
     message: Message,
     topic_names: TopicNameCache | None = None,
+    display_provider: str | None = None,
 ) -> None:
     """Handle ``/new`` and ``/new @topicname``.
 
@@ -177,7 +178,7 @@ async def handle_new_session(
         await send_rich(
             bot,
             chat_id,
-            t("new.topic_reset", name=resolved_name, provider=provider),
+            t("new.topic_reset", name=resolved_name, provider=display_provider or provider),
             SendRichOpts(reply_to_message_id=message.message_id, thread_id=thread_id),
         )
         return
@@ -188,7 +189,7 @@ async def handle_new_session(
     await send_rich(
         bot,
         chat_id,
-        new_session_text(provider),
+        new_session_text(display_provider or provider),
         SendRichOpts(reply_to_message_id=message.message_id, thread_id=thread_id),
     )
 

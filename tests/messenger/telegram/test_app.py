@@ -21,11 +21,15 @@ def _make_config(
     *,
     streaming_enabled: bool = True,
     user_ids: list[int] | None = None,
+    admin_user_ids: list[int] | None = None,
+    public_name: str = "",
     group_mention_only: bool = False,
 ) -> AgentConfig:
     return AgentConfig(
         telegram_token="test:token",
         allowed_user_ids=user_ids or [100],
+        admin_user_ids=admin_user_ids or [],
+        public_name=public_name,
         streaming=StreamingConfig(enabled=streaming_enabled),
         group_mention_only=group_mention_only,
     )
@@ -312,6 +316,21 @@ class TestOnHelp:
 
         opts = mock_send.call_args[0][3]
         assert opts.reply_to_message_id == msg.message_id
+
+    @patch("ductor_bot.messenger.telegram.app.send_rich", new_callable=AsyncMock)
+    async def test_normal_user_sees_klima_help_without_model_controls(
+        self, mock_send: AsyncMock
+    ) -> None:
+        config = _make_config(user_ids=[100, 200], admin_user_ids=[100], public_name="Klima AI")
+        tg_bot, _ = _make_tg_bot(config)
+        msg = _make_message(user_id=200)
+
+        await tg_bot._on_help(msg)
+
+        text = mock_send.call_args.args[2]
+        assert "Klima AI" in text
+        assert "/model" not in text
+        assert "/effort" not in text
 
 
 # ---------------------------------------------------------------------------
@@ -776,6 +795,20 @@ class TestCallbackQueryHandler:
         bot_instance.edit_message_text.assert_called_once()
         orch.handle_message_streaming.assert_not_called()
 
+    async def test_normal_user_cannot_use_model_selector_callback(self) -> None:
+        config = _make_config(user_ids=[100, 200], admin_user_ids=[100], public_name="Klima AI")
+        tg_bot, bot_instance = _make_tg_bot(config)
+        tg_bot._orchestrator = _make_orchestrator()
+        cb = _make_callback_query(data="ms:p:claude", user_id=200)
+
+        await tg_bot._on_callback_query(cb)
+
+        cb.answer.assert_awaited_once_with(
+            "This control is available only to the Klima AI administrator.",
+            show_alert=True,
+        )
+        bot_instance.edit_message_text.assert_not_called()
+
     async def test_cron_selector_callback_edits_message(self) -> None:
         tg_bot, bot_instance = _make_tg_bot()
         orch = _make_orchestrator()
@@ -1032,8 +1065,23 @@ class TestCommandHandlers:
         await tg_bot._on_new(msg)
 
         mock_new.assert_called_once_with(
-            orch, tg_bot.bot_instance, msg, topic_names=tg_bot._topic_names
+            orch,
+            tg_bot.bot_instance,
+            msg,
+            topic_names=tg_bot._topic_names,
+            display_provider=None,
         )
+
+    @patch("ductor_bot.messenger.telegram.app.handle_new_session", new_callable=AsyncMock)
+    async def test_on_new_uses_public_identity_for_normal_user(self, mock_new: AsyncMock) -> None:
+        config = _make_config(user_ids=[100, 200], admin_user_ids=[100], public_name="Klima AI")
+        tg_bot, _ = _make_tg_bot(config)
+        tg_bot._orchestrator = _make_orchestrator()
+        msg = _make_message(user_id=200)
+
+        await tg_bot._on_new(msg)
+
+        assert mock_new.await_args.kwargs["display_provider"] == "Klima AI"
 
     @patch(
         "ductor_bot.messenger.telegram.app.handle_abort", new_callable=AsyncMock, return_value=True
@@ -1256,6 +1304,24 @@ class TestSyncCommands:
         await tg_bot._sync_commands()
 
         bot_instance.set_my_commands.assert_called_once_with(_BOT_COMMANDS)
+
+    async def test_role_scopes_hide_internal_commands_from_normal_users(self) -> None:
+        from ductor_bot.messenger.telegram.app import _BOT_COMMANDS, _USER_COMMAND_NAMES
+
+        config = _make_config(user_ids=[100, 200], admin_user_ids=[100])
+        tg_bot, bot_instance = _make_tg_bot(config)
+        bot_instance.get_my_commands = AsyncMock(return_value=[])
+        bot_instance.set_my_commands = AsyncMock()
+        bot_instance.delete_my_commands = AsyncMock()
+
+        await tg_bot._sync_commands()
+
+        public_commands = [cmd for cmd in _BOT_COMMANDS if cmd.command in _USER_COMMAND_NAMES]
+        calls = bot_instance.set_my_commands.await_args_list
+        assert calls[0].args == (public_commands,)
+        scoped = {call.kwargs["scope"].chat_id: call.args[0] for call in calls[1:]}
+        assert scoped[100] == _BOT_COMMANDS
+        assert scoped[200] == public_commands
 
 
 # ---------------------------------------------------------------------------

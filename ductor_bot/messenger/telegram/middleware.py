@@ -40,6 +40,54 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
+def command_name(text: str) -> str | None:
+    """Return a normalized Telegram slash-command name, without bot mention."""
+    token = text.strip().split(None, 1)[0] if text.strip() else ""
+    if not token.startswith("/"):
+        return None
+    return token[1:].split("@", 1)[0].lower() or None
+
+
+class UserCommandMiddleware(BaseMiddleware):
+    """Allow normal users only the explicitly public command surface."""
+
+    def __init__(
+        self,
+        bot: Bot,
+        *,
+        admin_user_ids: set[int],
+        user_commands: frozenset[str],
+        public_name: str,
+    ) -> None:
+        self._bot = bot
+        self._admin_user_ids = admin_user_ids
+        self._user_commands = user_commands
+        self._public_name = public_name
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        if not isinstance(event, Message) or event.from_user is None:
+            return await handler(event, data)
+        command = command_name(event.text or "")
+        if command is None or event.from_user.id in self._admin_user_ids:
+            return await handler(event, data)
+        if command in self._user_commands:
+            return await handler(event, data)
+
+        await self._bot.send_message(
+            chat_id=event.chat.id,
+            text=f"This control is available only to the {self._public_name} administrator.",
+            reply_parameters=ReplyParameters(message_id=event.message_id),
+            message_thread_id=get_thread_id(event),
+        )
+        return None
+
+
 AbortHandler = Callable[[int, "Message"], Awaitable[bool]]
 """Async callback: (chat_id, message) -> handled?"""
 

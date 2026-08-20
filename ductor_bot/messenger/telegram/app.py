@@ -67,6 +67,7 @@ from ductor_bot.messenger.telegram.middleware import (
     MQ_PREFIX,
     AuthMiddleware,
     SequentialMiddleware,
+    UserCommandMiddleware,
 )
 from ductor_bot.messenger.telegram.sender import SendRichOpts, send_rich
 from ductor_bot.messenger.telegram.sender import (
@@ -109,6 +110,8 @@ _BOT_COMMANDS: list[BotCommand] = [
     BotCommand(command=cmd, description=desc) for cmd, desc in _COMMAND_DEFS
 ]
 
+_USER_COMMAND_NAMES = frozenset({"new", "stop", "interrupt", "help"})
+
 _CMD_DESC: dict[str, str] = {**dict(_COMMAND_DEFS), **dict(_MA_SUB_DEFS)}
 
 
@@ -130,7 +133,14 @@ def _help_line(command: str) -> str:
     return f"/{command} -- {description}" if description else f"/{command}"
 
 
-def _build_help_text() -> str:
+def _build_help_text(*, admin: bool = True, public_name: str = "Klima AI") -> str:
+    if not admin:
+        return fmt(
+            f"**{public_name}**",
+            SEP,
+            f"{_help_line('new')}\n{_help_line('stop')}\n"
+            f"{_help_line('interrupt')}\n{_help_line('help')}",
+        )
     return fmt(
         t("help.header"),
         SEP,
@@ -214,6 +224,9 @@ class TelegramBot:
         allowed_groups = set(config.allowed_group_ids)
         allowed_channels = set(config.allowed_channel_ids)
         self._allowed_users = allowed
+        self._roles_enabled = bool(config.admin_user_ids)
+        self._admin_users = set(config.admin_user_ids) if self._roles_enabled else set(allowed)
+        self._public_name = config.public_name.strip() or "Klima AI"
         self._allowed_groups = allowed_groups
         self._allowed_channels = allowed_channels
         self._chat_tracker: ChatTracker | None = None  # set in _on_startup
@@ -237,6 +250,15 @@ class TelegramBot:
         on_rejected = self._on_group_rejected
         auth = AuthMiddleware(allowed, allowed_group_ids=allowed_groups, on_rejected=on_rejected)
         self._router.message.outer_middleware(auth)
+        if self._roles_enabled:
+            self._router.message.outer_middleware(
+                UserCommandMiddleware(
+                    self._bot,
+                    admin_user_ids=self._admin_users,
+                    user_commands=_USER_COMMAND_NAMES,
+                    public_name=self._public_name,
+                )
+            )
         self._router.message.outer_middleware(self._sequential)
         self._router.callback_query.outer_middleware(
             AuthMiddleware(allowed, allowed_group_ids=allowed_groups, on_rejected=on_rejected)
@@ -308,6 +330,10 @@ class TelegramBot:
         if message.chat.type not in ("group", "supergroup"):
             return False
         return is_command_for_others(message, self._bot_username)
+
+    def _is_admin_user(self, user_id: int | None) -> bool:
+        """Return whether a Telegram sender has administrator controls."""
+        return user_id is not None and user_id in self._admin_users
 
     def file_roots(self, paths: DuctorPaths) -> list[Path] | None:
         """Allowed root directories for ``<file:...>`` tag sends."""
@@ -666,6 +692,25 @@ class TelegramBot:
 
     async def _show_welcome(self, message: Message) -> None:
         """Send the welcome screen with auth status and quick-start buttons."""
+        user_id = message.from_user.id if message.from_user else None
+        if self._roles_enabled and not self._is_admin_user(user_id):
+            name = f", {message.from_user.first_name}" if message.from_user else ""
+            text = (
+                f"**{self._public_name}**\n\n"
+                f"Hello{name}. Send me a message whenever you need something.\n\n"
+                "Use /help to see the available controls."
+            )
+            await send_rich(
+                self._bot,
+                message.chat.id,
+                text,
+                SendRichOpts(
+                    reply_to_message_id=message.message_id,
+                    thread_id=get_thread_id(message),
+                ),
+            )
+            return
+
         from ductor_bot.cli.auth import check_all_auth
 
         chat_id = message.chat.id
@@ -754,7 +799,10 @@ class TelegramBot:
         await send_rich(
             self._bot,
             message.chat.id,
-            _build_help_text(),
+            _build_help_text(
+                admin=self._is_admin_user(message.from_user.id if message.from_user else None),
+                public_name=self._public_name,
+            ),
             SendRichOpts(reply_to_message_id=message.message_id, thread_id=get_thread_id(message)),
         )
 
@@ -952,7 +1000,18 @@ class TelegramBot:
             return
         if self._config.group_mention_only and not self._is_addressed(message):
             return
-        await handle_new_session(self._orch, self._bot, message, topic_names=self._topic_names)
+        public_provider = None
+        if self._roles_enabled and not self._is_admin_user(
+            message.from_user.id if message.from_user else None
+        ):
+            public_provider = self._public_name
+        await handle_new_session(
+            self._orch,
+            self._bot,
+            message,
+            topic_names=self._topic_names,
+            display_provider=public_provider,
+        )
 
     async def _on_forum_topic_created(self, message: Message) -> None:
         """Cache the name when a forum topic is created."""
@@ -1175,8 +1234,20 @@ class TelegramBot:
         """
         from aiogram.types import InaccessibleMessage
 
-        await callback.answer()
         data = callback.data
+        if (
+            self._roles_enabled
+            and data
+            and data.startswith("ms:")
+            and not self._is_admin_user(callback.from_user.id if callback.from_user else None)
+        ):
+            await callback.answer(
+                f"This control is available only to the {self._public_name} administrator.",
+                show_alert=True,
+            )
+            return
+
+        await callback.answer()
         msg = callback.message
         if not data or msg is None or isinstance(msg, InaccessibleMessage):
             return
@@ -1595,9 +1666,17 @@ class TelegramBot:
         await handle_upgrade_callback(self, chat_id, message_id, data, thread_id=thread_id)
 
     async def _sync_commands(self) -> None:
-        from aiogram.types import BotCommandScopeAllGroupChats, BotCommandScopeAllPrivateChats
+        from aiogram.types import (
+            BotCommandScopeAllGroupChats,
+            BotCommandScopeAllPrivateChats,
+            BotCommandScopeChat,
+        )
 
-        desired = _BOT_COMMANDS
+        desired = (
+            [cmd for cmd in _BOT_COMMANDS if cmd.command in _USER_COMMAND_NAMES]
+            if self._roles_enabled
+            else _BOT_COMMANDS
+        )
 
         # Clear legacy scoped commands (previous versions set per-scope lists).
         # Telegram keeps scoped commands independently — they must be deleted
@@ -1619,6 +1698,26 @@ class TelegramBot:
         if current_tuples != desired_tuples:
             await self._bot.set_my_commands(desired)
             logger.info("Updated %d bot commands", len(desired))
+
+        if not self._roles_enabled:
+            return
+
+        # Private-chat scopes ensure admins see the full operational menu while
+        # normal users see only the public Klima AI controls. Setting every
+        # allowlisted user also overwrites any stale role scope after changes.
+        for user_id in self._allowed_users:
+            user_scope = BotCommandScopeChat(chat_id=user_id)
+            scoped_desired = _BOT_COMMANDS if user_id in self._admin_users else desired
+            scoped_current = await self._bot.get_my_commands(scope=user_scope)
+            current_scoped_tuples = [(c.command, c.description) for c in scoped_current]
+            desired_scoped_tuples = [(c.command, c.description) for c in scoped_desired]
+            if current_scoped_tuples != desired_scoped_tuples:
+                await self._bot.set_my_commands(scoped_desired, scope=user_scope)
+                logger.info(
+                    "Updated %d bot commands for user scope %d",
+                    len(scoped_desired),
+                    user_id,
+                )
 
     async def _watch_restart_marker(self) -> None:
         """Poll for restart-requested marker file."""

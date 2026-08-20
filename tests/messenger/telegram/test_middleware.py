@@ -31,6 +31,67 @@ def _make_message(
     return msg
 
 
+class TestUserCommandMiddleware:
+    async def test_normal_user_admin_command_is_blocked(self) -> None:
+        from ductor_bot.messenger.telegram.middleware import UserCommandMiddleware
+
+        bot = MagicMock()
+        bot.send_message = AsyncMock()
+        middleware = UserCommandMiddleware(
+            bot,
+            admin_user_ids={100},
+            user_commands=frozenset({"help", "new"}),
+            public_name="Klima AI",
+        )
+        handler = AsyncMock()
+        message = _make_message(user_id=200, text="/model")
+
+        result = await middleware(handler, message, {})
+
+        assert result is None
+        handler.assert_not_awaited()
+        bot.send_message.assert_awaited_once()
+        assert "Klima AI administrator" in bot.send_message.await_args.kwargs["text"]
+
+    async def test_admin_command_passes_for_admin(self) -> None:
+        from ductor_bot.messenger.telegram.middleware import UserCommandMiddleware
+
+        bot = MagicMock()
+        bot.send_message = AsyncMock()
+        middleware = UserCommandMiddleware(
+            bot,
+            admin_user_ids={100},
+            user_commands=frozenset({"help", "new"}),
+            public_name="Klima AI",
+        )
+        handler = AsyncMock(return_value="ok")
+        message = _make_message(user_id=100, text="/model")
+
+        result = await middleware(handler, message, {})
+
+        assert result == "ok"
+        handler.assert_awaited_once()
+        bot.send_message.assert_not_awaited()
+
+    async def test_public_command_and_normal_text_pass(self) -> None:
+        from ductor_bot.messenger.telegram.middleware import UserCommandMiddleware
+
+        bot = MagicMock()
+        bot.send_message = AsyncMock()
+        middleware = UserCommandMiddleware(
+            bot,
+            admin_user_ids={100},
+            user_commands=frozenset({"help", "new"}),
+            public_name="Klima AI",
+        )
+        handler = AsyncMock(return_value="ok")
+
+        assert await middleware(handler, _make_message(user_id=200, text="/help"), {}) == "ok"
+        assert await middleware(handler, _make_message(user_id=200, text="hello"), {}) == "ok"
+        assert handler.await_count == 2
+        bot.send_message.assert_not_awaited()
+
+
 class TestAuthMiddleware:
     """Test user ID filtering middleware."""
 

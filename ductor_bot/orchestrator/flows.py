@@ -231,6 +231,7 @@ async def _handle_timeout(
     so that the next user message can ``--resume`` the timed-out session.
     """
     model_name, _provider_name = _request_target(orch, request)
+    model_name = orch._config.public_name.strip() or model_name
     await orch._process_registry.kill_by_chat_topic(key.chat_id, key.topic_id)
 
     # Persist the session_id captured from SystemInitEvent so resume works.
@@ -514,7 +515,7 @@ async def _finalize_turn(  # noqa: PLR0913
         return await _reset_on_error(
             orch,
             key,
-            model_name=model_name,
+            model_name=orch._config.public_name.strip() or model_name,
             provider_name=provider_name,
             cli_detail=response.result,
         )
@@ -523,6 +524,7 @@ async def _finalize_turn(  # noqa: PLR0913
         _schedule_memory_flush(orch, key, session)
     logger.info("%s flow completed", flow_label)
     req_model, _prov = _request_target(orch, request)
+    req_model = orch._config.public_name.strip() or req_model
     result = _finish_normal(
         response, session, orch._config.session_age_warning_hours, model_name=req_model
     )
