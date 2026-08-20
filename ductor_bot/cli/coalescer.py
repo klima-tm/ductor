@@ -36,6 +36,7 @@ class StreamCoalescer:
         self._on_flush = on_flush
         self._buffer = ""
         self._idle_handle: asyncio.TimerHandle | None = None
+        self._idle_task: asyncio.Task[None] | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._flushing = False
 
@@ -71,12 +72,22 @@ class StreamCoalescer:
     async def flush(self, *, force: bool = False) -> None:
         """Flush the buffer if conditions are met or force is True."""
         self._cancel_idle()
+        # The idle callback may already have fired and be awaiting on_flush.
+        # Wait for it before reporting the explicit/final flush complete;
+        # otherwise callers can mistake the stream for empty and send the
+        # final response a second time.
+        idle_task = self._idle_task
+        if idle_task is not None and idle_task is not asyncio.current_task():
+            await idle_task
         if self._buffer and (force or len(self._buffer) >= self._config.min_chars):
             await self._do_flush()
 
     def stop(self) -> None:
         """Cancel idle timer. Call when stream ends."""
         self._cancel_idle()
+        if self._idle_task is not None and not self._idle_task.done():
+            self._idle_task.cancel()
+        self._idle_task = None
 
     def _find_sentence_break(self) -> int | None:
         """Find the position after the last sentence-ending punctuation."""
@@ -125,11 +136,13 @@ class StreamCoalescer:
         self._idle_handle = None
         loop = self._get_loop()
         task = loop.create_task(self._do_flush())
+        self._idle_task = task
         task.add_done_callback(self._flush_task_done)
 
-    @staticmethod
-    def _flush_task_done(task: asyncio.Task[None]) -> None:
+    def _flush_task_done(self, task: asyncio.Task[None]) -> None:
         """Log exceptions from idle-triggered flush tasks."""
+        if self._idle_task is task:
+            self._idle_task = None
         if task.cancelled():
             return
         exc = task.exception()

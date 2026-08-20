@@ -75,3 +75,28 @@ async def test_flush_reentrant_guard() -> None:
     await c.feed("x" * 15)  # Triggers max_chars flush
     assert len(flushed) == 1
     c.stop()
+
+
+async def test_final_flush_waits_for_inflight_idle_flush() -> None:
+    """A final flush must not return while the idle callback is still sending."""
+    started = asyncio.Event()
+    release = asyncio.Event()
+    flushed: list[str] = []
+
+    async def slow_flush(text: str) -> None:
+        started.set()
+        await release.wait()
+        flushed.append(text)
+
+    c = StreamCoalescer(CoalesceConfig(min_chars=5, max_chars=1000, idle_ms=1), slow_flush)
+    await c.feed("Hello world")
+    await started.wait()
+
+    final_flush = asyncio.create_task(c.flush(force=True))
+    await asyncio.sleep(0)
+    assert not final_flush.done()
+
+    release.set()
+    await final_flush
+    assert flushed == ["Hello world"]
+    c.stop()
