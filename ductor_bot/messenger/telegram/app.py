@@ -110,7 +110,7 @@ _BOT_COMMANDS: list[BotCommand] = [
     BotCommand(command=cmd, description=desc) for cmd, desc in _COMMAND_DEFS
 ]
 
-_USER_COMMAND_NAMES = frozenset({"new", "stop", "interrupt", "help"})
+_USER_COMMAND_NAMES = frozenset({"start", "new", "stop", "interrupt", "help"})
 
 _CMD_DESC: dict[str, str] = {**dict(_COMMAND_DEFS), **dict(_MA_SUB_DEFS)}
 

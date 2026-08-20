@@ -340,6 +340,20 @@ class TestOnHelp:
 
 class TestOnStart:
     @patch("ductor_bot.messenger.telegram.app.send_rich", new_callable=AsyncMock)
+    async def test_normal_user_start_shows_public_klima_welcome(self, mock_send: AsyncMock) -> None:
+        config = _make_config(user_ids=[100, 200], admin_user_ids=[100], public_name="Klima AI")
+        tg_bot, _ = _make_tg_bot(config)
+        msg = _make_message(chat_id=200, user_id=200)
+
+        await tg_bot._show_welcome(msg)
+
+        text = mock_send.await_args.args[2]
+        assert "Klima AI" in text
+        assert "Use /help to see the available controls." in text
+        assert "Claude" not in text
+        assert "Codex" not in text
+
+    @patch("ductor_bot.messenger.telegram.app.send_rich", new_callable=AsyncMock)
     @patch("ductor_bot.messenger.telegram.app.build_welcome_keyboard")
     @patch("ductor_bot.messenger.telegram.app.build_welcome_text", return_value="Welcome!")
     @patch("ductor_bot.cli.auth.check_all_auth", return_value={})
