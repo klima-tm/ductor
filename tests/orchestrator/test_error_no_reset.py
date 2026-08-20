@@ -230,7 +230,8 @@ async def test_auth_error_shows_hint(orch: Orchestrator) -> None:
 
     assert "Session Error" in result.text
     assert "Authentication failed" in result.text
-    assert "re-authenticate" in result.text
+    assert "subscription login" in result.text
+    assert "/model" in result.text
 
 
 async def test_rate_limit_error_shows_hint(orch: Orchestrator) -> None:
@@ -244,7 +245,8 @@ async def test_rate_limit_error_shows_hint(orch: Orchestrator) -> None:
 
     result = await normal(orch, SessionKey(chat_id=1), "Test")
 
-    assert "Rate limit" in result.text
+    assert "subscription usage" in result.text
+    assert "/model" in result.text
 
 
 async def test_unknown_error_shows_detail_line(orch: Orchestrator) -> None:
@@ -273,3 +275,4 @@ async def test_streaming_auth_error_shows_hint(orch: Orchestrator) -> None:
     result = await normal_streaming(orch, SessionKey(chat_id=1), "Test")
 
     assert "Authentication failed" in result.text
+    assert "/model" in result.text

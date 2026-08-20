@@ -33,7 +33,8 @@ class TestClassifyCliError:
         """Issue #117: Codex says 'usage limit', not 'rate limit' / '429'."""
         result = classify_cli_error("You've hit your usage limit. Try again at 6:00 PM.")
         assert result is not None
-        assert "Rate limit" in result
+        assert "subscription usage" in result
+        assert "/model" in result
 
     def test_codex_upgrade_to_pro(self) -> None:
         result = classify_cli_error("Upgrade to Pro for higher limits.")
@@ -64,6 +65,8 @@ class TestSessionErrorText:
         assert "Session Error" in text
         assert "[codex]" in text
         assert "Authentication failed" in text
+        assert "subscription login" in text
+        assert "/model" in text
 
     def test_with_unknown_error(self) -> None:
         text = session_error_text("opus", "Something weird happened\nMore details")

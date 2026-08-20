@@ -10,8 +10,8 @@ Your session has been preserved -- send another message to retry.
 Use /new to start a fresh session if the problem persists."""
 error_cause = "**Cause:** {hint}"
 error_detail = "**Detail:** `{detail}`"
-error_auth = "Authentication failed. Please re-authenticate the CLI (e.g. `codex auth` or check your API key)."
-error_rate = "Rate limit reached. Wait a moment and try again."
+error_auth = "Authentication failed. The CLI subscription login must be renewed; re-authenticate it, or use /model to switch providers meanwhile."
+error_rate = "Rate limit or subscription usage limit reached. Wait for it to reset, or use /model to switch providers."
 error_context = "Context length exceeded. Use /new to start a fresh session."
 
 reset_header = "**Session Reset**"
