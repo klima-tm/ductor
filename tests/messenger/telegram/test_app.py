@@ -353,6 +353,22 @@ class TestOnStart:
         assert "Claude" not in text
         assert "Codex" not in text
 
+    async def test_normal_user_start_does_not_send_internal_join_notification(self) -> None:
+        config = _make_config(user_ids=[100, 200], admin_user_ids=[100], public_name="Klima AI")
+        tg_bot, _ = _make_tg_bot(config)
+        msg = _make_message(chat_id=200, user_id=200)
+
+        with (
+            patch.object(tg_bot, "_show_welcome", new_callable=AsyncMock) as welcome,
+            patch.object(
+                tg_bot, "_send_join_notification", new_callable=AsyncMock
+            ) as join_notification,
+        ):
+            await tg_bot._on_start(msg)
+
+        welcome.assert_awaited_once_with(msg)
+        join_notification.assert_not_awaited()
+
     @patch("ductor_bot.messenger.telegram.app.send_rich", new_callable=AsyncMock)
     @patch("ductor_bot.messenger.telegram.app.build_welcome_keyboard")
     @patch("ductor_bot.messenger.telegram.app.build_welcome_text", return_value="Welcome!")

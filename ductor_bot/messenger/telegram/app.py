@@ -788,7 +788,9 @@ class TelegramBot:
         if self._config.group_mention_only and not self._is_addressed(message):
             return
         await self._show_welcome(message)
-        await self._send_join_notification(message.chat.id)
+        user_id = message.from_user.id if message.from_user else None
+        if not self._roles_enabled or self._is_admin_user(user_id):
+            await self._send_join_notification(message.chat.id)
 
     async def _on_help(self, message: Message) -> None:
         """Handle /help: show command reference."""
