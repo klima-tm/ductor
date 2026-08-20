@@ -23,7 +23,12 @@ from ductor_bot.orchestrator.hooks import HookContext
 from ductor_bot.orchestrator.registry import OrchestratorResult
 from ductor_bot.session import SessionData, SessionKey
 from ductor_bot.text.response_format import session_error_text, timeout_error_text
-from ductor_bot.workspace.loader import build_appended_files_block, read_mainmemory
+from ductor_bot.workspace.loader import build_appended_files_block
+from ductor_bot.workspace.memory_profiles import (
+    ensure_memory_file,
+    memory_system_prompt,
+    scope_memory_prompt,
+)
 
 if TYPE_CHECKING:
     from ductor_bot.orchestrator.core import Orchestrator
@@ -125,9 +130,13 @@ async def _prepare_normal(
 
     append_prompt = None
     if is_new:
-        mainmemory = await asyncio.to_thread(read_mainmemory, orch.paths)
-        if mainmemory.strip():
-            append_prompt = mainmemory
+        append_prompt = await asyncio.to_thread(
+            memory_system_prompt,
+            orch.paths,
+            key,
+            orch._config.memory_scope,
+            include_content=True,
+        )
 
         roster = _build_agent_roster(orch)
         if roster:
@@ -905,6 +914,11 @@ async def heartbeat_flow(
     if not session or not session.session_id:
         logger.debug("Heartbeat skipped: no active session")
         return None
+
+    memory_file = await asyncio.to_thread(
+        ensure_memory_file, orch.paths, key, orch._config.memory_scope
+    )
+    effective_prompt = scope_memory_prompt(effective_prompt, memory_file)
 
     set_log_context(session_id=session.session_id)
 

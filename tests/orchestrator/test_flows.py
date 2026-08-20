@@ -22,6 +22,7 @@ from ductor_bot.orchestrator.flows import (
 from ductor_bot.orchestrator.registry import OrchestratorResult
 from ductor_bot.session import SessionData
 from ductor_bot.session.key import SessionKey
+from ductor_bot.workspace.memory_profiles import ensure_memory_file
 
 
 @pytest.fixture
@@ -71,6 +72,28 @@ async def test_normal_new_session_injects_mainmemory(orch: Orchestrator) -> None
     assert request.append_system_prompt is not None
     assert "Important Context" in request.append_system_prompt
     assert request.resume_session is None  # New session
+
+
+async def test_normal_chat_memory_isolated_between_chats(orch: Orchestrator) -> None:
+    orch._config.memory_scope = "chat"
+    first_key = SessionKey.telegram(101)
+    second_key = SessionKey.telegram(202)
+    ensure_memory_file(orch.paths, first_key, "chat").write_text("- first private fact")
+    ensure_memory_file(orch.paths, second_key, "chat").write_text("- second private fact")
+    mock_execute = AsyncMock(return_value=_mock_response())
+    object.__setattr__(orch._cli_service, "execute", mock_execute)
+
+    await normal(orch, first_key, "Hello")
+    await normal(orch, second_key, "Hello")
+
+    first_prompt = mock_execute.call_args_list[0][0][0].append_system_prompt
+    second_prompt = mock_execute.call_args_list[1][0][0].append_system_prompt
+    assert first_prompt is not None
+    assert second_prompt is not None
+    assert "first private fact" in first_prompt
+    assert "second private fact" not in first_prompt
+    assert "second private fact" in second_prompt
+    assert "first private fact" not in second_prompt
 
 
 async def test_normal_resume_session_no_append(orch: Orchestrator) -> None:

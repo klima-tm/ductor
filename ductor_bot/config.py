@@ -101,7 +101,8 @@ _DEFAULT_FLUSH_PROMPT = (
     "## PRE-COMPACTION MEMORY FLUSH\n"
     "The conversation context is about to be compacted. Before that happens: "
     "review the recent conversation and APPEND any durable facts, decisions, "
-    "preferences, or learnings to memory_system/MAINMEMORY.md that are not "
+    "preferences, or learnings to the memory file specified in this session's "
+    "system context that are not "
     "already captured there. Do NOT overwrite existing entries. If there is "
     "nothing new worth saving, reply exactly: FLUSH_NOOP"
 )
@@ -111,19 +112,19 @@ _DEFAULT_MEMORY_REFLECTION_PROMPT = (
     "Review the last several messages in this conversation.\n"
     "Check: were there any new decisions, corrections, error solutions, user "
     "preferences, or important facts that you did NOT yet write to memory?\n"
-    "If yes -- update memory_system/MAINMEMORY.md silently.\n"
+    "If yes -- update only the scoped memory file from the system context silently.\n"
     "If everything is already recorded -- do nothing."
 )
 
 _DEFAULT_COMPACT_PROMPT = (
     "## MEMORY COMPACTION\n"
-    "memory_system/MAINMEMORY.md has grown large. Rewrite it as follows:\n"
+    "The scoped memory file from the system context has grown large. Rewrite it as follows:\n"
     "1. Preserve entries from the last {preserve_days} days verbatim.\n"
     "2. For older entries, cluster by topic and replace each cluster with "
     "ONE dense entry that preserves all key facts in fewer lines.\n"
     "3. Target size: roughly {target_lines} lines total.\n"
     "4. Do NOT delete facts -- only compress their expression.\n"
-    "If MAINMEMORY.md is already at or below {target_lines} lines, reply "
+    "If the scoped memory file is already at or below {target_lines} lines, reply "
     "exactly: COMPACT_NOOP"
 )
 
@@ -484,6 +485,7 @@ class AgentConfig(BaseModel):
     memory_flush: MemoryFlushConfig = Field(default_factory=MemoryFlushConfig)
     memory_reflection: MemoryReflectionConfig = Field(default_factory=MemoryReflectionConfig)
     memory_compaction: MemoryCompactionConfig = Field(default_factory=MemoryCompactionConfig)
+    memory_scope: str = "agent"
     webhooks: WebhookConfig = Field(default_factory=WebhookConfig)
     api: ApiConfig = Field(default_factory=ApiConfig)
     cli_parameters: CLIParametersConfig = Field(default_factory=CLIParametersConfig)
@@ -522,6 +524,13 @@ class AgentConfig(BaseModel):
         if not normalized or normalized.lower() in NULLISH_TEXT_VALUES:
             return None
         return normalized
+
+    @field_validator("memory_scope")
+    @classmethod
+    def _validate_memory_scope(cls, value: str) -> str:
+        if value not in {"agent", "chat"}:
+            raise ValueError("memory_scope must be 'agent' or 'chat'")
+        return value
 
     @model_validator(mode="after")
     def _sync_cli_timeout_to_timeouts(self) -> AgentConfig:

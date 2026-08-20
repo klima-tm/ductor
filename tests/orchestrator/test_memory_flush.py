@@ -14,6 +14,7 @@ from ductor_bot.config import MemoryCompactionConfig, MemoryFlushConfig
 from ductor_bot.orchestrator.memory_flush import MemoryFlusher
 from ductor_bot.session import SessionKey
 from ductor_bot.session.manager import ProviderSessionData, SessionData
+from ductor_bot.workspace.memory_profiles import ensure_memory_file
 from ductor_bot.workspace.paths import DuctorPaths
 
 
@@ -71,7 +72,8 @@ async def test_memory_flusher_fires_silent_turn_after_boundary(tmp_path: Path) -
 
     assert cli.execute.await_count == 1
     request = cli.execute.await_args[0][0]
-    assert request.prompt == MemoryFlushConfig().flush_prompt
+    assert request.prompt.startswith(MemoryFlushConfig().flush_prompt)
+    assert "memory_system/MAINMEMORY.md" in request.prompt
     assert request.resume_session == "sess-abc"
     assert request.chat_id == 101
     assert request.process_label == "memory_flush"
@@ -170,6 +172,35 @@ async def test_memory_flusher_skips_compaction_when_disabled(tmp_path: Path) -> 
 
     assert cli.execute.await_count == 1
     assert cli.execute.await_args[0][0].process_label == "memory_flush"
+
+
+async def test_memory_flusher_compacts_only_current_chat_profile(tmp_path: Path) -> None:
+    cli = AsyncMock()
+    cli.execute = AsyncMock(return_value=AgentResponse(result=""))
+    paths = _make_paths(tmp_path)
+    current = SessionKey.telegram(101)
+    other = SessionKey.telegram(202)
+    ensure_memory_file(paths, current, "chat").write_text(
+        "\n".join(f"- current {index}" for index in range(80))
+    )
+    ensure_memory_file(paths, other, "chat").write_text("- other private fact")
+    flusher = MemoryFlusher(
+        MemoryFlushConfig(),
+        cli,
+        MemoryCompactionConfig(trigger_lines=70),
+        paths,
+        memory_scope="chat",
+    )
+    session = _session_with_id("sess-abc")
+
+    flusher.mark_boundary(current)
+    await flusher.maybe_flush(current, session)
+
+    assert cli.execute.await_count == 2
+    for call in cli.execute.await_args_list:
+        prompt = call[0][0].prompt
+        assert str(ensure_memory_file(paths, current, "chat")) in prompt
+        assert str(ensure_memory_file(paths, other, "chat")) not in prompt
 
 
 async def test_memory_flusher_falls_back_on_bad_prompt_placeholder(

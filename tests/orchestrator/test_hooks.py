@@ -109,7 +109,7 @@ class TestMainmemoryReminder:
         assert MAINMEMORY_REMINDER.condition(_ctx(message_count=4)) is False
 
     def test_suffix_contains_key_phrases(self) -> None:
-        assert "MAINMEMORY.md" in MAINMEMORY_REMINDER.suffix
+        assert "scoped memory file" in MAINMEMORY_REMINDER.suffix
         assert "MEMORY CHECK" in MAINMEMORY_REMINDER.suffix
 
 
@@ -151,7 +151,7 @@ async def test_hook_injects_into_prompt_on_6th_message(orch: Orchestrator) -> No
     sixth_call = mock_execute.call_args_list[5]
     request = sixth_call[0][0]
     assert "MEMORY CHECK" in request.prompt
-    assert "memory_system/MAINMEMORY.md" in request.prompt
+    assert "scoped memory file" in request.prompt
 
 
 async def test_hook_not_injected_before_6th(orch: Orchestrator) -> None:
