@@ -111,10 +111,17 @@ class CodexCLI(BaseCLI):
     def _build_resume_command(self, session_id: str, *, json_output: bool) -> list[str]:
         """Build command to resume an existing Codex session."""
         cfg = self._config
-        cmd = [self._cli, "exec", "resume"]
+        # Sandbox/approval flags belong to `codex exec`, not its `resume`
+        # subcommand.  Codex 0.147 rejects `--sandbox` after `resume`.
+        cmd = [self._cli, "exec"]
+        cmd += self._sandbox_flags()
+        cmd.append("resume")
         if json_output:
             cmd.append("--json")
-        cmd += self._sandbox_flags()
+        # Resume performs the same trusted-directory check as a fresh exec.
+        # Ductor workspaces are valid non-Git directories, so keep parity with
+        # the fresh-session command.
+        cmd.append("--skip-git-repo-check")
         # Codex stores the model and effort at session creation; re-assert
         # both so later /model and /effort changes apply on resumed turns,
         # matching Claude's per-turn --model/--effort behavior.

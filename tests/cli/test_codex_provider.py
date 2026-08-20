@@ -276,7 +276,7 @@ class TestBuildCommand:
         cmd = cli._build_command("hello", resume_session="thread-abc")
         assert cmd[0] == "/usr/bin/codex"
         assert cmd[1] == "exec"
-        assert cmd[2] == "resume"
+        assert cmd.index("--dangerously-bypass-approvals-and-sandbox") < cmd.index("resume")
         assert "--json" in cmd
         assert "--dangerously-bypass-approvals-and-sandbox" in cmd
         idx_model = cmd.index("--model")
@@ -286,7 +286,16 @@ class TestBuildCommand:
         assert cmd[idx_separator + 1] == "thread-abc"
         assert cmd[-1] == "-"  # prompt arrives via stdin (#137)
         assert "--color" not in cmd
-        assert "--skip-git-repo-check" not in cmd
+        assert "--skip-git-repo-check" in cmd
+
+    def test_resume_sandbox_flag_precedes_subcommand(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Codex 0.147 parses --sandbox as an exec option, before resume."""
+        cli = _make_cli(monkeypatch, permission_mode="default", sandbox_mode="read-only")
+
+        cmd = cli._build_command("hello", resume_session="thread-abc")
+
+        assert cmd[1:5] == ["exec", "--sandbox", "read-only", "resume"]
+        assert "--skip-git-repo-check" in cmd
 
     @pytest.mark.parametrize("model", [None, ""])
     def test_resume_session_no_model_omits_flag(
