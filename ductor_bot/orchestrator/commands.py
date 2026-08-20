@@ -21,7 +21,7 @@ from ductor_bot.orchestrator.selectors.models import Button, ButtonGrid
 from ductor_bot.orchestrator.selectors.session_selector import session_selector_start
 from ductor_bot.orchestrator.selectors.task_selector import task_selector_start
 from ductor_bot.text.response_format import SEP, fmt, new_session_text
-from ductor_bot.workspace.loader import read_mainmemory
+from ductor_bot.workspace.memory_profiles import read_scoped_memory
 
 if TYPE_CHECKING:
     from ductor_bot.orchestrator.core import Orchestrator
@@ -74,10 +74,12 @@ async def cmd_effort(orch: Orchestrator, key: SessionKey, _text: str) -> Orchest
     return OrchestratorResult(text=resp.text, buttons=resp.buttons)
 
 
-async def cmd_memory(orch: Orchestrator, _key: SessionKey, _text: str) -> OrchestratorResult:
+async def cmd_memory(orch: Orchestrator, key: SessionKey, _text: str) -> OrchestratorResult:
     """Handle /memory."""
     logger.info("Memory requested")
-    content = await asyncio.to_thread(read_mainmemory, orch.paths)
+    content = await asyncio.to_thread(
+        read_scoped_memory, orch.paths, key, orch._config.memory_scope
+    )
     if not content.strip():
         return OrchestratorResult(
             text=fmt(

@@ -22,6 +22,7 @@ def _make_service(**overrides: Any) -> CLIService:
         max_budget_usd=overrides.pop("max_budget_usd", None),
         permission_mode=overrides.pop("permission_mode", "bypassPermissions"),
         docker_container=overrides.pop("docker_container", ""),
+        memory_scope=overrides.pop("memory_scope", "agent"),
     )
     models = ModelRegistry()
 
@@ -315,6 +316,19 @@ def test_make_cli_memory_flush_in_project_root_keeps_workspace_memory_path() -> 
 
     cli_config = mock_create.call_args.args[0]
     assert "/default/workspace/memory_system/MAINMEMORY.md" in cli_config.append_system_prompt
+
+
+def test_make_cli_chat_memory_override_uses_opaque_profile_path() -> None:
+    svc = _make_service(working_dir="/default/workspace", memory_scope="chat")
+    svc.set_working_dir_resolver(lambda _req: "/projects/alpha")
+
+    with patch("ductor_bot.cli.service.create_cli") as mock_create:
+        svc._make_cli(AgentRequest(prompt="hi", chat_id=123456, topic_id=5))
+
+    append_prompt = mock_create.call_args.args[0].append_system_prompt
+    assert "/default/workspace/memory_system/profiles/" in append_prompt
+    assert append_prompt.endswith("never via a relative path.")
+    assert "123456" not in append_prompt
 
 
 def test_make_cli_no_override_leaves_append_prompt_untouched() -> None:

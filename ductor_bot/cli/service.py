@@ -10,6 +10,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ductor_bot.cli.base import CLIConfig
@@ -25,6 +26,8 @@ from ductor_bot.cli.stream_events import (
     ToolUseEvent,
 )
 from ductor_bot.cli.types import AgentRequest, AgentResponse, CLIResponse
+from ductor_bot.session import SessionKey
+from ductor_bot.workspace.memory_profiles import memory_path_from_workspace
 
 if TYPE_CHECKING:
     from ductor_bot.cli.base import BaseCLI
@@ -118,6 +121,7 @@ class CLIServiceConfig:
     # External transcription hooks (#66) — empty strings keep built-in strategies.
     transcribe_command: str = ""
     video_transcribe_command: str = ""
+    memory_scope: str = "agent"
 
     def cli_parameters_for_provider(self, provider: str) -> list[str]:
         """Return CLI parameters for the given provider."""
@@ -380,10 +384,14 @@ class CLIService:
                 # addressing the bot memory by absolute path — a relative
                 # memory_system/ reference would otherwise land inside the
                 # user's project repo.
+                key = SessionKey.for_transport(request.transport, request.chat_id, request.topic_id)
+                scoped_memory = memory_path_from_workspace(
+                    Path(self._config.working_dir), key, self._config.memory_scope
+                )
                 note = (
                     f"[ductor] Project cwd override active. The shared bot workspace "
                     f"(tools/, memory_system/) is at {self._config.working_dir}. Bot memory "
-                    f"lives at {self._config.working_dir}/memory_system/MAINMEMORY.md — always "
+                    f"lives at {scoped_memory} — always "
                     f"address it by this absolute path, never via a relative path."
                 )
                 append_prompt = f"{append_prompt}\n\n{note}" if append_prompt else note

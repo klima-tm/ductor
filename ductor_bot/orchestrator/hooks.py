@@ -95,10 +95,11 @@ MAINMEMORY_REMINDER = MessageHook(
     condition=every_n_messages(6),
     suffix=(
         "## MEMORY CHECK\n"
-        "Silently review: memory_system/MAINMEMORY.md, user_tools/, cron_tasks/.\n"
+        "Silently review the memory file specified in this session's system context, "
+        "plus user_tools/ and cron_tasks/.\n"
         "Compare what you already know with this conversation so far.\n"
         "If something important is missing from memory (personality, preferences, "
-        "decisions, facts) -- update MAINMEMORY.md silently.\n"
+        "decisions, facts) -- update only that scoped memory file silently.\n"
         "If you notice a gap that only the user can fill, ask ONE natural follow-up "
         "question that fits the current conversation. Do not interrogate."
     ),

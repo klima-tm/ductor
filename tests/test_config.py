@@ -41,6 +41,7 @@ def test_agent_config_defaults() -> None:
     assert cfg.allowed_user_ids == []
     assert cfg.admin_user_ids == []
     assert cfg.public_name == ""
+    assert cfg.memory_scope == "agent"
     assert cfg.cron_delivery_retry.enabled is False
     assert cfg.cron_delivery_retry.interval_seconds == 300
     assert cfg.cron_delivery_retry.max_attempts == 12
@@ -71,6 +72,11 @@ def test_agent_config_docker_defaults() -> None:
 def test_agent_config_rejects_invalid_types() -> None:
     with pytest.raises(ValidationError, match="idle_timeout_minutes"):
         AgentConfig(idle_timeout_minutes="not_a_number")  # type: ignore[arg-type]
+
+
+def test_agent_config_rejects_invalid_memory_scope() -> None:
+    with pytest.raises(ValidationError, match="memory_scope"):
+        AgentConfig(memory_scope="shared")
 
 
 # -- deep_merge_config --

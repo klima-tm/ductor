@@ -164,6 +164,7 @@ class Orchestrator:
                 interagent_port=interagent_port,
                 transcribe_command=config.transcription.audio_command,
                 video_transcribe_command=config.transcription.video_command,
+                memory_scope=config.memory_scope,
             ),
             models=self._providers.models,
             available_providers=frozenset(),
@@ -201,6 +202,7 @@ class Orchestrator:
                 self._cli_service,
                 config.memory_compaction,
                 paths,
+                memory_scope=config.memory_scope,
             )
             if config.memory_flush.enabled
             else None
@@ -785,6 +787,7 @@ class Orchestrator:
                     antigravity_cli_parameters=tuple(config.cli_parameters.antigravity),
                     transcribe_command=config.transcription.audio_command,
                     video_transcribe_command=config.transcription.video_command,
+                    memory_scope=config.memory_scope,
                 )
             )
 

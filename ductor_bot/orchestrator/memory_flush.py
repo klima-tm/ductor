@@ -1,8 +1,8 @@
 """Pre-compaction silent memory flush + LLM-driven compaction (#77, #80).
 
 When the CLI emits ``CompactBoundaryEvent`` mid-stream, this helper runs a
-silent follow-up turn that instructs the agent to APPEND durable facts to
-``memory_system/MAINMEMORY.md`` so the post-compaction context retains what
+silent follow-up turn that instructs the agent to APPEND durable facts to the
+configured agent-wide or chat-scoped memory file so post-compaction context retains what
 the user just told us (#77). When the resulting file grows past
 ``trigger_lines``, a second silent turn chains in to rewrite the file
 densely -- preserving recent entries verbatim and compressing older
@@ -27,7 +27,11 @@ from typing import TYPE_CHECKING
 
 from ductor_bot.cli.types import AgentRequest
 from ductor_bot.errors import CLIError
-from ductor_bot.workspace.loader import read_mainmemory
+from ductor_bot.workspace.memory_profiles import (
+    memory_path,
+    read_scoped_memory,
+    scope_memory_prompt,
+)
 
 if TYPE_CHECKING:
     from ductor_bot.bus.lock_pool import LockPool
@@ -43,19 +47,21 @@ logger = logging.getLogger(__name__)
 class MemoryFlusher:
     """Tracks pre-compaction boundary events and runs silent flush + compact turns."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         config: MemoryFlushConfig,
         cli_service: CLIService,
         compaction_config: MemoryCompactionConfig,
         paths: DuctorPaths,
         *,
+        memory_scope: str = "agent",
         lock_pool: LockPool | None = None,
     ) -> None:
         self._config = config
         self._cli = cli_service
         self._compaction = compaction_config
         self._paths = paths
+        self._memory_scope = memory_scope
         self._lock_pool = lock_pool
         self._boundary_seen: set[SessionKey] = set()
         self._last_flushed: dict[SessionKey, float] = {}
@@ -88,11 +94,11 @@ class MemoryFlusher:
             return True
         return (time.monotonic() - last) > self._config.dedup_seconds
 
-    def should_compact(self) -> bool:
-        """True when compaction is enabled and MAINMEMORY.md exceeds threshold."""
+    def should_compact(self, key: SessionKey) -> bool:
+        """True when compaction is enabled and scoped memory exceeds threshold."""
         if not self._compaction.enabled:
             return False
-        content = read_mainmemory(self._paths)
+        content = read_scoped_memory(self._paths, key, self._memory_scope)
         line_count = len(content.splitlines())
         return line_count >= self._compaction.trigger_lines
 
@@ -101,7 +107,7 @@ class MemoryFlusher:
         if not self.should_flush(key):
             return
         await self.flush(key, session)
-        if self.should_compact():
+        if self.should_compact(key):
             await self.compact(key, session)
 
     async def flush(self, key: SessionKey, session: SessionData) -> None:
@@ -113,7 +119,7 @@ class MemoryFlusher:
             return
 
         request = AgentRequest(
-            prompt=self._config.flush_prompt,
+            prompt=self._scoped_prompt(self._config.flush_prompt, key),
             chat_id=key.chat_id,
             topic_id=key.topic_id,
             transport=key.transport,
@@ -140,7 +146,7 @@ class MemoryFlusher:
             )
             return
 
-        prompt = self._render_compact_prompt()
+        prompt = self._scoped_prompt(self._render_compact_prompt(), key)
         request = AgentRequest(
             prompt=prompt,
             chat_id=key.chat_id,
@@ -184,3 +190,7 @@ class MemoryFlusher:
             default_prompt = MemoryCompactionConfig.model_fields["prompt"].default
             assert isinstance(default_prompt, str)
             return default_prompt.format(**fmt_kwargs)
+
+    def _scoped_prompt(self, prompt: str, key: SessionKey) -> str:
+        target = memory_path(self._paths, key, self._memory_scope)
+        return scope_memory_prompt(prompt, target)

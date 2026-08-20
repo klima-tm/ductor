@@ -135,6 +135,21 @@ async def test_memory_empty(orch: Orchestrator) -> None:
     assert "empty" in result.text.lower()
 
 
+async def test_memory_chat_scope_returns_only_current_chat(orch: Orchestrator) -> None:
+    from ductor_bot.workspace.memory_profiles import ensure_memory_file
+
+    orch._config.memory_scope = "chat"
+    first_key = SessionKey.telegram(101)
+    second_key = SessionKey.telegram(202)
+    ensure_memory_file(orch.paths, first_key, "chat").write_text("first private fact")
+    ensure_memory_file(orch.paths, second_key, "chat").write_text("second private fact")
+
+    result = await cmd_memory(orch, first_key, "/memory")
+
+    assert "first private fact" in result.text
+    assert "second private fact" not in result.text
+
+
 # -- cmd_cron --
 
 
