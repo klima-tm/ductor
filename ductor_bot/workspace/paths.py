@@ -119,6 +119,11 @@ class DuctorPaths:
         return self.ductor_home / "chat_activity.json"
 
     @property
+    def reply_preferences_path(self) -> Path:
+        """Per-chat Telegram voice/text reply preferences."""
+        return self.ductor_home / "reply_preferences.json"
+
+    @property
     def named_sessions_path(self) -> Path:
         return self.ductor_home / "named_sessions.json"
 

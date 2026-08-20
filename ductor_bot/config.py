@@ -37,6 +37,38 @@ class StreamingConfig(BaseModel):
     show_thinking_indicator: bool = True
 
 
+class SpeechConfig(BaseModel):
+    """Outbound speech settings.
+
+    The API key is read from ``api_key_file`` at request time and is never
+    placed in the provider subprocess environment.
+    """
+
+    enabled: bool = False
+    provider: str = "elevenlabs"
+    voice_id: str = ""
+    api_key_file: str = ""
+    model_id: str = "eleven_multilingual_v2"
+    output_format: str = "opus_48000_64"
+    default_reply_mode: str = "voice"
+    timeout_seconds: float = Field(default=45.0, gt=0)
+    max_chars: int = Field(default=10_000, gt=0)
+
+    @field_validator("provider")
+    @classmethod
+    def _validate_provider(cls, value: str) -> str:
+        if value != "elevenlabs":
+            raise ValueError("speech.provider must be 'elevenlabs'")
+        return value
+
+    @field_validator("default_reply_mode")
+    @classmethod
+    def _validate_default_reply_mode(cls, value: str) -> str:
+        if value not in {"voice", "text"}:
+            raise ValueError("speech.default_reply_mode must be 'voice' or 'text'")
+        return value
+
+
 class DockerConfig(BaseModel):
     """Settings for Docker-based CLI sandboxing."""
 
@@ -445,6 +477,7 @@ class AgentConfig(BaseModel):
     project_roots: dict[str, str] = Field(default_factory=dict)
     gemini_api_key: str | None = None
     streaming: StreamingConfig = Field(default_factory=StreamingConfig)
+    speech: SpeechConfig = Field(default_factory=SpeechConfig)
     docker: DockerConfig = Field(default_factory=DockerConfig)
     heartbeat: HeartbeatConfig = Field(default_factory=HeartbeatConfig)
     cleanup: CleanupConfig = Field(default_factory=CleanupConfig)

@@ -10,7 +10,7 @@ import pytest
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Chat, Message, User
 
-from ductor_bot.config import AgentConfig, StreamingConfig
+from ductor_bot.config import AgentConfig, SpeechConfig, StreamingConfig
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -331,6 +331,51 @@ class TestOnHelp:
         assert "Klima AI" in text
         assert "/model" not in text
         assert "/effort" not in text
+        assert "/reply" in text
+
+
+class TestReplyMode:
+    @patch("ductor_bot.messenger.telegram.app.send_rich", new_callable=AsyncMock)
+    async def test_reply_text_persists_for_chat(self, mock_send: AsyncMock, tmp_path: Path) -> None:
+        config = AgentConfig(
+            telegram_token="test:token",
+            allowed_user_ids=[100],
+            ductor_home=str(tmp_path),
+        )
+        tg_bot, _ = _make_tg_bot(config)
+        message = _make_message(chat_id=100, text="/reply text")
+
+        await tg_bot._on_reply_mode(message)
+
+        assert tg_bot._reply_modes.get(100) == "text"
+        assert "Text replies enabled" in mock_send.await_args.args[2]
+
+        from ductor_bot.messenger.telegram.speech import ReplyModeStore
+
+        reloaded = ReplyModeStore(tmp_path / "reply_preferences.json")
+        assert reloaded.get(100) == "text"
+
+    @patch("ductor_bot.messenger.telegram.app.run_voice_message", new_callable=AsyncMock)
+    async def test_configured_default_voice_routes_normal_messages_to_voice(
+        self, run_voice: AsyncMock, tmp_path: Path
+    ) -> None:
+        config = AgentConfig(
+            telegram_token="test:token",
+            allowed_user_ids=[100],
+            ductor_home=str(tmp_path),
+            speech=SpeechConfig(
+                enabled=True,
+                voice_id="fixed-voice",
+                api_key_file=str(tmp_path / "elevenlabs.key"),
+            ),
+        )
+        tg_bot, _ = _make_tg_bot(config)
+        tg_bot._orchestrator = _make_orchestrator()
+
+        await tg_bot._on_message(_make_message(chat_id=100, text="Hello"))
+
+        run_voice.assert_awaited_once()
+        assert run_voice.await_args.args[0].speech is tg_bot._speech
 
 
 # ---------------------------------------------------------------------------

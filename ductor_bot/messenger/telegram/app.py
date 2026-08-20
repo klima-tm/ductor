@@ -60,8 +60,10 @@ from ductor_bot.messenger.telegram.media import (
 from ductor_bot.messenger.telegram.message_dispatch import (
     NonStreamingDispatch,
     StreamingDispatch,
+    VoiceDispatch,
     run_non_streaming_message,
     run_streaming_message,
+    run_voice_message,
 )
 from ductor_bot.messenger.telegram.middleware import (
     MQ_PREFIX,
@@ -73,6 +75,7 @@ from ductor_bot.messenger.telegram.sender import SendRichOpts, send_rich
 from ductor_bot.messenger.telegram.sender import (
     send_files_from_text as _send_files_from_text,
 )
+from ductor_bot.messenger.telegram.speech import ElevenLabsSpeech, ReplyModeStore
 from ductor_bot.messenger.telegram.topic import (
     TopicNameCache,
     get_session_key,
@@ -90,7 +93,7 @@ from ductor_bot.multiagent.bus import AsyncInterAgentResult
 from ductor_bot.session.key import SessionKey
 from ductor_bot.tasks.models import TaskResult
 from ductor_bot.text.response_format import SEP, fmt
-from ductor_bot.workspace.paths import DuctorPaths
+from ductor_bot.workspace.paths import DuctorPaths, resolve_paths
 
 if TYPE_CHECKING:
     from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
@@ -106,13 +109,29 @@ _CAPTION_LIMIT = 1024
 TypingContext = _TypingContext
 send_files_from_text = _send_files_from_text
 
-_BOT_COMMANDS: list[BotCommand] = [
-    BotCommand(command=cmd, description=desc) for cmd, desc in _COMMAND_DEFS
-]
 
-_USER_COMMAND_NAMES = frozenset({"start", "new", "stop", "interrupt", "help"})
+def _telegram_bot_commands(command_defs: list[tuple[str, str]]) -> list[BotCommand]:
+    commands = [BotCommand(command=cmd, description=desc) for cmd, desc in command_defs]
+    interrupt_index = next(
+        (index for index, command in enumerate(commands) if command.command == "interrupt"),
+        len(commands) - 1,
+    )
+    commands.insert(
+        interrupt_index + 1,
+        BotCommand(command="reply", description="Voice or text replies"),
+    )
+    return commands
 
-_CMD_DESC: dict[str, str] = {**dict(_COMMAND_DEFS), **dict(_MA_SUB_DEFS)}
+
+_BOT_COMMANDS: list[BotCommand] = _telegram_bot_commands(_COMMAND_DEFS)
+
+_USER_COMMAND_NAMES = frozenset({"start", "new", "stop", "interrupt", "reply", "help"})
+
+_CMD_DESC: dict[str, str] = {
+    **dict(_COMMAND_DEFS),
+    **dict(_MA_SUB_DEFS),
+    "reply": "Voice or text replies",
+}
 
 
 def _rebuild_commands() -> None:
@@ -122,9 +141,9 @@ def _rebuild_commands() -> None:
 
     cmd_defs = get_bot_commands()
     ma_defs = get_multiagent_sub_commands()
-    _BOT_COMMANDS = [BotCommand(command=cmd, description=desc) for cmd, desc in cmd_defs]
+    _BOT_COMMANDS = _telegram_bot_commands(cmd_defs)
     _CMD_DESC.clear()
-    _CMD_DESC.update({**dict(cmd_defs), **dict(ma_defs)})
+    _CMD_DESC.update({**dict(cmd_defs), **dict(ma_defs), "reply": "Voice or text replies"})
 
 
 def _help_line(command: str) -> str:
@@ -139,13 +158,14 @@ def _build_help_text(*, admin: bool = True, public_name: str = "Klima AI") -> st
             f"**{public_name}**",
             SEP,
             f"{_help_line('new')}\n{_help_line('stop')}\n"
-            f"{_help_line('interrupt')}\n{_help_line('help')}",
+            f"{_help_line('interrupt')}\n{_help_line('reply')}\n{_help_line('help')}",
         )
     return fmt(
         t("help.header"),
         SEP,
         f"{t('help.cat_daily')}\n{_help_line('new')}\n{_help_line('reset')}\n{_help_line('stop')}\n"
         f"{_help_line('interrupt')}\n{_help_line('stop_all')}\n"
+        f"{_help_line('reply')}\n"
         f"{_help_line('model')}\n{_help_line('effort')}\n{_help_line('status')}\n{_help_line('memory')}",
         f"{t('help.cat_automation')}\n{_help_line('session')}\n{_help_line('tasks')}\n{_help_line('cron')}",
         f"{t('help.cat_multiagent')}\n{_help_line('agent_commands')}",
@@ -227,6 +247,12 @@ class TelegramBot:
         self._roles_enabled = bool(config.admin_user_ids)
         self._admin_users = set(config.admin_user_ids) if self._roles_enabled else set(allowed)
         self._public_name = config.public_name.strip() or "Klima AI"
+        paths = resolve_paths(config.ductor_home)
+        self._reply_modes = ReplyModeStore(
+            paths.reply_preferences_path,
+            default_mode=config.speech.default_reply_mode,
+        )
+        self._speech = ElevenLabsSpeech(config.speech)
         self._allowed_groups = allowed_groups
         self._allowed_channels = allowed_channels
         self._chat_tracker: ChatTracker | None = None  # set in _on_startup
@@ -426,6 +452,7 @@ class TelegramBot:
         r.message(Command("stop", ignore_case=True))(self._on_stop)
         r.message(Command("restart", ignore_case=True))(self._on_restart)
         r.message(Command("new", ignore_case=True))(self._on_new)
+        r.message(Command("reply", ignore_case=True))(self._on_reply_mode)
         r.message(Command("session", ignore_case=True))(self._on_session)
         r.message(Command("sessions", ignore_case=True))(self._on_sessions)
         r.message(Command("tasks", ignore_case=True))(self._on_tasks)
@@ -1017,6 +1044,32 @@ class TelegramBot:
             display_provider=public_provider,
         )
 
+    async def _on_reply_mode(self, message: Message) -> None:
+        """Show or persist the caller's voice/text reply preference."""
+        text = (message.text or "").strip()
+        parts = text.split(None, 1)
+        chat_id = message.chat.id
+        thread_id = get_thread_id(message)
+        current = self._reply_modes.get(chat_id)
+        if len(parts) == 1 or parts[1].strip().lower() not in {"voice", "text"}:
+            response = f"Reply mode: **{current}**\n\nUse `/reply voice` or `/reply text`."
+        else:
+            mode = parts[1].strip().lower()
+            assert mode in {"voice", "text"}
+            await self._reply_modes.set(chat_id, mode)  # type: ignore[arg-type]
+            if mode == "voice" and not self._speech.configured:
+                response = "Voice mode is saved. I'll use text until voice service is configured."
+            elif mode == "voice":
+                response = "Voice replies enabled."
+            else:
+                response = "Text replies enabled."
+        await send_rich(
+            self._bot,
+            chat_id,
+            response,
+            SendRichOpts(reply_to_message_id=message.message_id, thread_id=thread_id),
+        )
+
     async def _on_forum_topic_created(self, message: Message) -> None:
         """Cache the name when a forum topic is created."""
         from ductor_bot.messenger.telegram.topic import get_topic_name_from_message
@@ -1465,7 +1518,21 @@ class TelegramBot:
         if self._config.scene.seen_reaction and not self._config.scene.status_reaction:
             await self._set_seen_reaction(message)
 
-        if self._config.streaming.enabled:
+        if self._reply_modes.get(key.chat_id) == "voice" and self._speech.configured:
+            await run_voice_message(
+                VoiceDispatch(
+                    bot=self._bot,
+                    orchestrator=self._orch,
+                    message=message,
+                    key=key,
+                    text=text,
+                    speech=self._speech,
+                    allowed_roots=self.file_roots(self._orch.paths),
+                    thread_id=thread_id,
+                    scene_config=self._config.scene,
+                )
+            )
+        elif self._config.streaming.enabled:
             await self._handle_streaming(message, key, text, thread_id=thread_id)
         else:
             await self._handle_non_streaming(message, key, text, thread_id=thread_id)

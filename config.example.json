@@ -57,6 +57,17 @@
         "show_tool_progress": true,
         "show_thinking_indicator": true
     },
+    "speech": {
+        "enabled": false,
+        "provider": "elevenlabs",
+        "voice_id": "",
+        "api_key_file": "~/.ductor/secrets/elevenlabs-api-key",
+        "model_id": "eleven_multilingual_v2",
+        "output_format": "opus_48000_64",
+        "default_reply_mode": "voice",
+        "timeout_seconds": 45.0,
+        "max_chars": 10000
+    },
     "docker": {
         "enabled": true,
         "image_name": "ductor-sandbox",

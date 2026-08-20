@@ -13,6 +13,7 @@ from ductor_bot.messenger.telegram.sender import (
     send_files_from_text,
     send_rich,
 )
+from ductor_bot.messenger.telegram.speech import ElevenLabsSpeech, SpeechError
 from ductor_bot.messenger.telegram.streaming import StreamEditor, create_stream_editor
 from ductor_bot.messenger.telegram.typing import TypingContext
 from ductor_bot.orchestrator.registry import OrchestratorResult
@@ -189,6 +190,21 @@ class StreamingDispatch:
     scene_config: SceneConfig | None = None
 
 
+@dataclass(slots=True)
+class VoiceDispatch:
+    """Input payload for one final native Telegram voice-note turn."""
+
+    bot: Bot
+    orchestrator: Orchestrator
+    message: Message
+    key: SessionKey
+    text: str
+    speech: ElevenLabsSpeech
+    allowed_roots: list[Path] | None
+    thread_id: int | None = None
+    scene_config: SceneConfig | None = None
+
+
 async def run_non_streaming_message(
     dispatch: NonStreamingDispatch,
 ) -> str:
@@ -222,6 +238,93 @@ async def run_non_streaming_message(
                 thread_id=dispatch.thread_id,
             ),
         )
+        return result.text
+    finally:
+        await tracker.clear()
+
+
+async def run_voice_message(dispatch: VoiceDispatch) -> str:
+    """Generate one model answer, synthesize it, and send a native voice note.
+
+    Telegram cannot progressively stream a voice note, so a temporary status
+    message is shown while the model and ElevenLabs finish. Any synthesis or
+    upload failure falls back to the complete text answer.
+    """
+    import contextlib
+
+    from aiogram.exceptions import TelegramAPIError
+    from aiogram.types import BufferedInputFile, ReplyParameters
+
+    tracker = ReactionTracker(
+        dispatch.bot,
+        dispatch.key.chat_id,
+        dispatch.message.message_id,
+        enabled=_status_reaction_enabled(dispatch.scene_config),
+    )
+    status = None
+    try:
+        await tracker.set_thinking()
+        status = await dispatch.bot.send_message(
+            chat_id=dispatch.key.chat_id,
+            text="Klima AI is thinking…",
+            message_thread_id=dispatch.thread_id,
+        )
+        async with TypingContext(dispatch.bot, dispatch.key.chat_id, thread_id=dispatch.thread_id):
+            result = await dispatch.orchestrator.handle_message(dispatch.key, dispatch.text)
+
+        footer = _build_footer(result, dispatch.scene_config)
+        if footer:
+            result.text += footer
+        with contextlib.suppress(TelegramAPIError):
+            await dispatch.bot.edit_message_text(
+                chat_id=dispatch.key.chat_id,
+                message_id=status.message_id,
+                text="Klima AI is preparing a voice reply…",
+            )
+
+        try:
+            audio = await dispatch.speech.synthesize(result.text)
+            await dispatch.bot.send_voice(
+                chat_id=dispatch.key.chat_id,
+                voice=BufferedInputFile(audio, filename="klima-ai.ogg"),
+                reply_parameters=ReplyParameters(
+                    message_id=dispatch.message.message_id,
+                    allow_sending_without_reply=True,
+                ),
+                message_thread_id=dispatch.thread_id,
+            )
+            await send_files_from_text(
+                dispatch.bot,
+                dispatch.key.chat_id,
+                result.text,
+                allowed_roots=dispatch.allowed_roots,
+                thread_id=dispatch.thread_id,
+            )
+        except (SpeechError, TelegramAPIError) as exc:
+            logger.warning("Voice reply failed; falling back to text: %s", exc)
+            with contextlib.suppress(TelegramAPIError):
+                await dispatch.bot.edit_message_text(
+                    chat_id=dispatch.key.chat_id,
+                    message_id=status.message_id,
+                    text="Voice is unavailable right now, so I'm sending text instead.",
+                )
+            await send_rich(
+                dispatch.bot,
+                dispatch.key.chat_id,
+                result.text,
+                SendRichOpts(
+                    reply_to_message_id=dispatch.message.message_id,
+                    allowed_roots=dispatch.allowed_roots,
+                    thread_id=dispatch.thread_id,
+                ),
+            )
+            return result.text
+
+        with contextlib.suppress(TelegramAPIError):
+            await dispatch.bot.delete_message(
+                chat_id=dispatch.key.chat_id,
+                message_id=status.message_id,
+            )
         return result.text
     finally:
         await tracker.clear()
