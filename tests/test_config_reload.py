@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -227,6 +228,27 @@ class TestConfigReloader:
 
         assert cfg.project_roots == {"my-project": "~/code/my-project"}
         assert applied.get("project_roots") == {"my-project": "~/code/my-project"}
+
+    async def test_detects_change_when_mtime_does_not_advance(self, tmp_path: Path) -> None:
+        config_path = tmp_path / "config.json"
+        cfg = self._write_config(config_path, model="sonnet")
+        initial_stat = config_path.stat()
+
+        on_hot = MagicMock()
+        reloader = ConfigReloader(config_path, cfg, on_hot_reload=on_hot)
+
+        self._write_config(config_path, model="opus")
+        # Reproduce filesystems that return the same timestamp for rapid rewrites.
+        os.utime(
+            config_path,
+            ns=(initial_stat.st_atime_ns, initial_stat.st_mtime_ns),
+        )
+        assert config_path.stat().st_mtime_ns == initial_stat.st_mtime_ns
+
+        await reloader._check()
+
+        on_hot.assert_called_once()
+        assert cfg.model == "opus"
 
     async def test_same_content_rewrite_no_callback(self, tmp_path: Path) -> None:
         config_path = tmp_path / "config.json"
