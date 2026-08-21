@@ -27,7 +27,8 @@ python3 tools/memory_tools/memory.py forget MEMORY_ID
 - Use `update` for a correction that does not need historical preservation.
 - Use `supersede` when a previously true fact changed; this preserves the old
   fact as historical and creates an active replacement.
-- Use `forget` only when the user explicitly asks for deletion.
+- Use `forget` only when the user explicitly asks for deletion. It deletes the
+  selected fact and its complete supersession history.
 - Never store credentials, secrets, speculative interpretations, or temporary
   conversational details.
 - Do not claim that memory succeeded unless the tool returns `success: true`.

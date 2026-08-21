@@ -43,6 +43,9 @@ def test_add_search_update_supersede_and_forget(tmp_path: Path) -> None:
     forgotten = store.forget(replacement.memory_id)
     assert forgotten.memory_id == replacement.memory_id
     assert store.search("") == []
+    remaining = target.read_text(encoding="utf-8")
+    assert "concise answers" not in remaining
+    assert "detailed answers" not in remaining
 
 
 def test_rejects_secrets_unknown_categories_and_cross_profile_ids(tmp_path: Path) -> None:

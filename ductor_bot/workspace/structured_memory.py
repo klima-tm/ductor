@@ -245,7 +245,24 @@ class StructuredMemoryStore:
         with self._lock:
             text = self._read()
             found = self._find(text, memory_id)
-            atomic_text_save(self._path, self._remove_record(text, found.memory_id))
+            records = self._records(text, include_superseded=True)
+            lineage_ids = {found.memory_id}
+            changed = True
+            while changed:
+                changed = False
+                for record in records:
+                    if record.superseded_by in lineage_ids and record.memory_id not in lineage_ids:
+                        lineage_ids.add(record.memory_id)
+                        changed = True
+                    if record.memory_id in lineage_ids and record.superseded_by:
+                        before = len(lineage_ids)
+                        lineage_ids.add(record.superseded_by)
+                        changed = changed or len(lineage_ids) != before
+            updated = text
+            for record in records:
+                if record.memory_id in lineage_ids:
+                    updated = self._remove_record(updated, record.memory_id)
+            atomic_text_save(self._path, updated)
             return found
 
     def _read(self) -> str:
