@@ -399,7 +399,12 @@ class CLIService:
         allowed_tools: list[str] = []
         if provider == "claude" and dict(request.runtime_env).get("DUCTOR_MEMORY_CAPABILITY"):
             memory_tool = Path(self._config.working_dir) / "tools" / "memory_tools" / "memory.py"
-            allowed_tools.append(f"Bash(python3 {memory_tool} *)")
+            allowed_tools.extend(
+                [
+                    "Bash(python3 tools/memory_tools/memory.py *)",
+                    f"Bash(python3 {memory_tool} *)",
+                ]
+            )
 
         return create_cli(
             CLIConfig(

@@ -105,7 +105,7 @@ def memory_system_prompt(
         "succeeded unless the tool returned success.\n"
         f"Memory tool: python3 {tool} "
         "{add|search|update|supersede|forget} ...\n"
-        f"Read {tool.parent / 'RULES.md'} for the exact operations."
+        f"Read {tool.parent / 'AGENTS.md'} for the exact operations."
     )
     parts = [heading, boundary, f"Memory path: {target}", tool_rules]
     if include_content:

@@ -366,7 +366,8 @@ def test_make_cli_allows_only_scoped_memory_command_for_claude() -> None:
             )
         )
     assert mock_create.call_args.args[0].allowed_tools == [
-        "Bash(python3 /private/workspace/tools/memory_tools/memory.py *)"
+        "Bash(python3 tools/memory_tools/memory.py *)",
+        "Bash(python3 /private/workspace/tools/memory_tools/memory.py *)",
     ]
 
 
