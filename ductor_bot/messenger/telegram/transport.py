@@ -216,8 +216,38 @@ class TelegramTransport:
             await send_rich(self._bot.bot_instance, env.chat_id, env.result_text, opts)
 
     async def _deliver_webhook_wake(self, env: Envelope) -> None:
-        """Deliver webhook wake result."""
+        """Deliver a proactive agent reply using the chat's sticky reply mode."""
         if env.result_text:
+            await self._deliver_user_reply(env)
+
+    async def _deliver_user_reply(self, env: Envelope) -> None:
+        """Send text or native voice consistently with normal user turns."""
+        if self._bot._reply_modes.get(env.chat_id) != "voice" or not self._bot._speech.configured:
+            await send_rich(self._bot.bot_instance, env.chat_id, env.result_text, self._opts(env))
+            return
+
+        from aiogram.exceptions import TelegramAPIError
+        from aiogram.types import BufferedInputFile
+
+        from ductor_bot.messenger.telegram.sender import send_files_from_text
+        from ductor_bot.messenger.telegram.speech import SpeechError
+
+        try:
+            audio = await self._bot._speech.synthesize(env.result_text)
+            await self._bot.bot_instance.send_voice(
+                chat_id=env.chat_id,
+                voice=BufferedInputFile(audio, filename="emily.ogg"),
+                message_thread_id=env.topic_id,
+            )
+            await send_files_from_text(
+                self._bot.bot_instance,
+                env.chat_id,
+                env.result_text,
+                allowed_roots=self._roots(),
+                thread_id=env.topic_id,
+            )
+        except (SpeechError, TelegramAPIError) as exc:
+            logger.warning("Proactive voice reply failed; falling back to text: %s", exc)
             await send_rich(self._bot.bot_instance, env.chat_id, env.result_text, self._opts(env))
 
     async def _deliver_cron(self, env: Envelope) -> None:

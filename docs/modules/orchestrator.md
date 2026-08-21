@@ -38,7 +38,8 @@ High-level steps:
 4. instantiate `Orchestrator` (sessions, CLI service, hook registry, optional memory flusher)
 5. provider auth detection + available-provider update
 6. initialize Gemini/Antigravity/Codex cache observers
-7. initialize/start task observers (`Background`, `Cron`, `Webhook`) + `Heartbeat` + `Cleanup`
+7. initialize/start task observers (`Background`, `Cron`, `Webhook`) + `Heartbeat` +
+   optional `Instagram` + `Cleanup`
 8. start rule/skill watcher tasks
 9. optional API server startup
 10. start config reloader

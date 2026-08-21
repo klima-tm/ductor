@@ -205,6 +205,8 @@ Main chat:  "Ask codex-agent to write tests for the API"
 - **Cron jobs** — in-process scheduler with timezone support, per-job overrides, optional silent-on-success, result routing to originating chat
 - **Webhooks** — `wake` (inject into active chat) and `cron_task` (isolated task run) modes
 - **Heartbeat** — proactive checks with per-target settings, group/topic support, chat validation
+- **Instagram monitor** — optional HikerAPI polling for new posts, reels, and stories with
+  deduplication, real-media inspection, and proactive delivery to one allowlisted chat
 - **Image processing** — auto-resize and WebP conversion for incoming images (configurable)
 - **Media transcription hooks** — configurable external audio/video transcription commands for bundled media tools
 - **Notification routing** — startup/upgrade lifecycle messages can target specific chats/topics
@@ -458,6 +460,7 @@ the bundled agent tool scripts.
     cron_tasks/ skills/ tools/       # Scripts and tools
     tasks/                           # Per-task folders
     telegram_files/ matrix_files/    # Media files (per transport)
+    instagram_files/                 # Media fetched by the Instagram monitor
     api_files/                       # Uploaded/downloadable API files
     output_to_user/                  # Generated deliverables
   agents/<name>/                     # Sub-agent workspaces (isolated)

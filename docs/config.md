@@ -95,6 +95,7 @@ Changes take effect on the next CLI invocation (mtime-based cache invalidation, 
 | `group_mention_only` | `bool` | `false` | Mention/reply gating in group rooms. Telegram: filter only (no auth bypass). Matrix: in non-DM rooms this bypasses `allowed_users` and uses room + mention/reply as gate |
 | `matrix` | `MatrixConfig` | see below | Matrix homeserver connection (required when `transport=matrix`) |
 | `streaming` | `StreamingConfig` | see below | Streaming tuning |
+| `instagram_monitor` | `InstagramMonitorConfig` | see below | Optional HikerAPI monitor for posts, reels, and stories |
 | `docker` | `DockerConfig` | see below | Docker sidecar config |
 | `heartbeat` | `HeartbeatConfig` | see below | Background heartbeat config |
 | `memory_flush` | `MemoryFlushConfig` | see below | Silent pre-compaction memory flush after streaming compact boundaries |
@@ -477,6 +478,31 @@ Applied to incoming images across all transports (Telegram, Matrix, API). See `f
 | `status_reaction` | `bool` | `true` | Telegram-only stage tracker on the user message while the turn runs; when enabled it wins over `seen_reaction` so both do not fight over the same emoji slot |
 | `technical_footer` | `bool` | `false` | Appends model/token/cost/time footer to agent responses |
 
+## `InstagramMonitorConfig`
+
+The monitor deterministically polls HikerAPI and wakes the configured chat only
+when it sees a new Instagram media ID. The first successful poll seeds existing
+content without sending it. Downloaded images/videos are placed under
+`workspace/instagram_files/` for actual model inspection. The HikerAPI key is
+read from a protected file and is never exported to model subprocesses.
+
+| Field | Type | Default | Notes |
+|---|---|---|---|
+| `enabled` | `bool` | `false` | Master toggle |
+| `provider` | `str` | `"hikerapi"` | Only HikerAPI is currently supported |
+| `username` | `str` | `""` | Instagram username, with optional leading `@` |
+| `chat_id` | `int` | `0` | One Telegram target; it must also be in `allowed_user_ids` |
+| `api_key_file` | `str` | `""` | Protected HikerAPI key file |
+| `poll_interval_seconds` | `float` | `300` | Poll interval; minimum 60 seconds |
+| `timeout_seconds` | `float` | `45` | Per-request timeout |
+| `max_download_bytes` | `int` | `52428800` | Maximum bytes downloaded per media resource |
+| `max_media_per_item` | `int` | `5` | Maximum carousel resources inspected, from 1 to 10 |
+
+The monitor reads public-profile data. It downloads only HTTPS media from
+Instagram CDN hosts, caps resource size, treats captions as untrusted content,
+and retries an item if generation or delivery returns no response. Proactive
+Telegram replies honor the chat's sticky voice/text preference.
+
 ## `NotificationsConfig`
 
 | Field | Type | Default | Notes |
@@ -523,7 +549,7 @@ model-invoked bundled fallback chain intact:
 | Field | Type | Default | Notes |
 |---|---|---|---|
 | `enabled` | `bool` | `true` | Master toggle |
-| `media_files_days` | `int` | `30` | Retention for media files (telegram + matrix) |
+| `media_files_days` | `int` | `30` | Retention for media files (telegram + matrix + Instagram monitor) |
 | `output_to_user_days` | `int` | `30` | Retention in `workspace/output_to_user/` |
 | `api_files_days` | `int` | `30` | Retention in `workspace/api_files/` |
 | `check_hour` | `int` | `3` | Local hour in `user_timezone` for cleanup run |

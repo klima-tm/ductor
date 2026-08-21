@@ -71,6 +71,17 @@
         "timeout_seconds": 45.0,
         "max_chars": 10000
     },
+    "instagram_monitor": {
+        "enabled": false,
+        "provider": "hikerapi",
+        "username": "YOUR_INSTAGRAM_USERNAME",
+        "chat_id": 123456789,
+        "api_key_file": "~/.ductor/secrets/hikerapi-api-key",
+        "poll_interval_seconds": 300.0,
+        "timeout_seconds": 45.0,
+        "max_download_bytes": 52428800,
+        "max_media_per_item": 5
+    },
     "docker": {
         "enabled": true,
         "image_name": "ductor-sandbox",

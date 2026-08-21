@@ -34,6 +34,7 @@ from ductor_bot.config_reload import ConfigReloader
 from ductor_bot.cron.manager import CronManager
 from ductor_bot.cron.observer import CronObserver
 from ductor_bot.heartbeat import HeartbeatObserver
+from ductor_bot.instagram import InstagramObserver
 from ductor_bot.webhook.manager import WebhookManager
 from ductor_bot.webhook.models import WebhookResult
 from ductor_bot.webhook.observer import WebhookObserver
@@ -52,6 +53,7 @@ class ObserverManager:
         self._paths = paths
         self.heartbeat = HeartbeatObserver(config)
         self.cleanup = CleanupObserver(config, paths)
+        self.instagram = InstagramObserver(config, paths)
 
         self.cron: CronObserver | None = None
         self.webhook: WebhookObserver | None = None
@@ -166,6 +168,7 @@ class ObserverManager:
         await self.heartbeat.start()
         if self.webhook:
             await self.webhook.start()
+        await self.instagram.start()
         await self.cleanup.start()
 
         self._rule_sync_task = asyncio.create_task(watch_rule_files(self._paths.workspace))
@@ -200,6 +203,7 @@ class ObserverManager:
         await self.heartbeat.stop()
         if self.webhook:
             await self.webhook.stop()
+        await self.instagram.stop()
         if self.cron:
             await self.cron.stop()
         await self.cleanup.stop()
@@ -288,5 +292,14 @@ class ObserverManager:
                     await bus.submit(from_webhook_cron_result(result))
 
             self.webhook.set_result_handler(_on_webhook)
-            if wake_handler:
-                self.webhook.set_wake_handler(wake_handler)
+        self._wire_wake_handlers(wake_handler)
+
+    def _wire_wake_handlers(
+        self,
+        wake_handler: Callable[[int, str], Awaitable[str | None]] | None,
+    ) -> None:
+        if wake_handler is None:
+            return
+        if self.webhook:
+            self.webhook.set_wake_handler(wake_handler)
+        self.instagram.set_wake_handler(wake_handler)

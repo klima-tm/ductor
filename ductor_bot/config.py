@@ -69,6 +69,36 @@ class SpeechConfig(BaseModel):
         return value
 
 
+class InstagramMonitorConfig(BaseModel):
+    """Proactive Instagram monitoring through HikerAPI.
+
+    The API key is read from ``api_key_file`` only by the deterministic
+    monitor. It is never exported to a model subprocess.
+    """
+
+    enabled: bool = False
+    provider: str = "hikerapi"
+    username: str = ""
+    chat_id: int = 0
+    api_key_file: str = ""
+    poll_interval_seconds: float = Field(default=300.0, ge=60.0)
+    timeout_seconds: float = Field(default=45.0, gt=0)
+    max_download_bytes: int = Field(default=50 * 1024 * 1024, gt=0)
+    max_media_per_item: int = Field(default=5, ge=1, le=10)
+
+    @field_validator("provider")
+    @classmethod
+    def _validate_provider(cls, value: str) -> str:
+        if value != "hikerapi":
+            raise ValueError("instagram_monitor.provider must be 'hikerapi'")
+        return value
+
+    @field_validator("username")
+    @classmethod
+    def _normalize_username(cls, value: str) -> str:
+        return value.strip().removeprefix("@").lower()
+
+
 class DockerConfig(BaseModel):
     """Settings for Docker-based CLI sandboxing."""
 
@@ -492,6 +522,7 @@ class AgentConfig(BaseModel):
     gemini_api_key: str | None = None
     streaming: StreamingConfig = Field(default_factory=StreamingConfig)
     speech: SpeechConfig = Field(default_factory=SpeechConfig)
+    instagram_monitor: InstagramMonitorConfig = Field(default_factory=InstagramMonitorConfig)
     docker: DockerConfig = Field(default_factory=DockerConfig)
     heartbeat: HeartbeatConfig = Field(default_factory=HeartbeatConfig)
     cleanup: CleanupConfig = Field(default_factory=CleanupConfig)
