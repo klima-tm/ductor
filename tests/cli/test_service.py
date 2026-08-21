@@ -388,6 +388,15 @@ def test_make_cli_does_not_add_memory_shell_allowance_for_codex() -> None:
         'mcp_servers.ductor_memory.command="python3"',
         "-c",
         'mcp_servers.ductor_memory.args=["/private/workspace/tools/memory_tools/memory_mcp.py"]',
+        "-c",
+        'mcp_servers.ductor_memory.env_vars=["DUCTOR_MEMORY_CAPABILITY"]',
+        "-c",
+        "mcp_servers.ductor_memory.enabled_tools=['memory_add', 'memory_search', "
+        "'memory_update', 'memory_supersede', 'memory_forget']",
+        "-c",
+        'mcp_servers.ductor_memory.default_tools_approval_mode="approve"',
+        "-c",
+        "mcp_servers.ductor_memory.required=true",
     ]
 
 

@@ -408,12 +408,27 @@ class CLIService:
             )
         if provider == "codex" and dict(request.runtime_env).get("DUCTOR_MEMORY_CAPABILITY"):
             mcp_tool = Path(self._config.working_dir) / "tools" / "memory_tools" / "memory_mcp.py"
+            memory_tools = [
+                "memory_add",
+                "memory_search",
+                "memory_update",
+                "memory_supersede",
+                "memory_forget",
+            ]
             cli_parameters.extend(
                 [
                     "-c",
                     'mcp_servers.ductor_memory.command="python3"',
                     "-c",
                     f'mcp_servers.ductor_memory.args=["{mcp_tool}"]',
+                    "-c",
+                    'mcp_servers.ductor_memory.env_vars=["DUCTOR_MEMORY_CAPABILITY"]',
+                    "-c",
+                    f"mcp_servers.ductor_memory.enabled_tools={memory_tools!r}",
+                    "-c",
+                    'mcp_servers.ductor_memory.default_tools_approval_mode="approve"',
+                    "-c",
+                    "mcp_servers.ductor_memory.required=true",
                 ]
             )
 
