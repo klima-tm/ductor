@@ -383,6 +383,12 @@ def test_make_cli_does_not_add_memory_shell_allowance_for_codex() -> None:
             )
         )
     assert mock_create.call_args.args[0].allowed_tools == []
+    assert mock_create.call_args.args[0].cli_parameters == [
+        "-c",
+        'mcp_servers.ductor_memory.command="python3"',
+        "-c",
+        'mcp_servers.ductor_memory.args=["/private/workspace/tools/memory_tools/memory_mcp.py"]',
+    ]
 
 
 def test_docker_enabled_property() -> None:

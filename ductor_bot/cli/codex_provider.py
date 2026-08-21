@@ -115,6 +115,8 @@ class CodexCLI(BaseCLI):
         # subcommand.  Codex 0.147 rejects `--sandbox` after `resume`.
         cmd = [self._cli, "exec"]
         cmd += self._sandbox_flags()
+        if cfg.cli_parameters:
+            cmd.extend(cfg.cli_parameters)
         cmd.append("resume")
         if json_output:
             cmd.append("--json")

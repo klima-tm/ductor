@@ -8,6 +8,10 @@ replying.
 The tool is scoped by an ephemeral capability to the current chat profile.
 It cannot select or inspect another user.
 
+If native `memory_add`, `memory_search`, `memory_update`, `memory_supersede`,
+and `memory_forget` tools are available, use them directly. Otherwise use the
+Python commands below.
+
 ## Operations
 
 ```bash

@@ -397,12 +397,23 @@ class CLIService:
                 append_prompt = f"{append_prompt}\n\n{note}" if append_prompt else note
 
         allowed_tools: list[str] = []
+        cli_parameters = self._config.cli_parameters_for_provider(provider)
         if provider == "claude" and dict(request.runtime_env).get("DUCTOR_MEMORY_CAPABILITY"):
             memory_tool = Path(self._config.working_dir) / "tools" / "memory_tools" / "memory.py"
             allowed_tools.extend(
                 [
                     "Bash(python3 tools/memory_tools/memory.py *)",
                     f"Bash(python3 {memory_tool} *)",
+                ]
+            )
+        if provider == "codex" and dict(request.runtime_env).get("DUCTOR_MEMORY_CAPABILITY"):
+            mcp_tool = Path(self._config.working_dir) / "tools" / "memory_tools" / "memory_mcp.py"
+            cli_parameters.extend(
+                [
+                    "-c",
+                    'mcp_servers.ductor_memory.command="python3"',
+                    "-c",
+                    f'mcp_servers.ductor_memory.args=["{mcp_tool}"]',
                 ]
             )
 
@@ -424,7 +435,7 @@ class CLIService:
                 topic_id=request.topic_id,
                 transport=request.transport,
                 process_label=request.process_label,
-                cli_parameters=self._config.cli_parameters_for_provider(provider),
+                cli_parameters=cli_parameters,
                 agent_name=self._config.agent_name,
                 interagent_port=self._config.interagent_port,
                 transcribe_command=self._config.transcribe_command,

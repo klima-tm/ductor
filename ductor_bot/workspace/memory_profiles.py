@@ -105,6 +105,8 @@ def memory_system_prompt(
         "or forgetting a fact. Use forget only when the user explicitly requests "
         "deletion. You may say or imply that something was noted, saved, remembered, "
         "updated, or forgotten only after the tool returns success.\n"
+        "Prefer native memory_add, memory_search, memory_update, memory_supersede, "
+        "and memory_forget tools when available. Otherwise use the Python tool.\n"
         f"Memory tool: python3 {tool} "
         "{add|search|update|supersede|forget} ...\n"
         f"Read {tool.parent / 'AGENTS.md'} for the exact operations."
