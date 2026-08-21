@@ -97,7 +97,8 @@ Matrix startup follows a similar pattern (orchestrator creation, bus wiring, obs
 4. instantiate `Orchestrator`
 5. check provider auth and apply provider availability
 6. initialize model cache observers (Gemini + Antigravity + Grok + Codex), only for provider CLIs found by startup auth detection
-7. initialize task observers (`BackgroundObserver`, `CronObserver`, `WebhookObserver`)
+7. initialize task observers (`BackgroundObserver`, `CronObserver`, `WebhookObserver`) and
+   the optional deterministic `InstagramObserver`
 8. start observers (`cron`, `heartbeat`, `webhook`, `cleanup`) + rule/skill watchers
 9. optional API server startup
 10. start config reloader

@@ -124,6 +124,16 @@ class DuctorPaths:
         return self.ductor_home / "reply_preferences.json"
 
     @property
+    def instagram_monitor_state_path(self) -> Path:
+        """Deduplication state for proactive Instagram monitoring."""
+        return self.ductor_home / "instagram_monitor_state.json"
+
+    @property
+    def instagram_files_dir(self) -> Path:
+        """Downloaded Instagram media supplied to the active model."""
+        return self.workspace / "instagram_files"
+
+    @property
     def named_sessions_path(self) -> Path:
         return self.ductor_home / "named_sessions.json"
 
