@@ -396,6 +396,11 @@ class CLIService:
                 )
                 append_prompt = f"{append_prompt}\n\n{note}" if append_prompt else note
 
+        allowed_tools: list[str] = []
+        if provider == "claude" and dict(request.runtime_env).get("DUCTOR_MEMORY_CAPABILITY"):
+            memory_tool = Path(self._config.working_dir) / "tools" / "memory_tools" / "memory.py"
+            allowed_tools.append(f"Bash(python3 {memory_tool} *)")
+
         return create_cli(
             CLIConfig(
                 provider=provider,
@@ -420,6 +425,7 @@ class CLIService:
                 transcribe_command=self._config.transcribe_command,
                 video_transcribe_command=self._config.video_transcribe_command,
                 runtime_env=dict(request.runtime_env),
+                allowed_tools=allowed_tools,
             )
         )
 

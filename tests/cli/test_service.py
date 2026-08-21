@@ -354,6 +354,36 @@ def test_make_cli_passes_ephemeral_runtime_environment() -> None:
     assert mock_create.call_args.args[0].runtime_env == {"DUCTOR_MEMORY_CAPABILITY": "turn-secret"}
 
 
+def test_make_cli_allows_only_scoped_memory_command_for_claude() -> None:
+    svc = _make_service(working_dir="/private/workspace")
+    with patch("ductor_bot.cli.service.create_cli") as mock_create:
+        svc._make_cli(
+            AgentRequest(
+                prompt="hi",
+                provider_override="claude",
+                model_override="opus",
+                runtime_env=(("DUCTOR_MEMORY_CAPABILITY", "turn-secret"),),
+            )
+        )
+    assert mock_create.call_args.args[0].allowed_tools == [
+        "Bash(python3 /private/workspace/tools/memory_tools/memory.py *)"
+    ]
+
+
+def test_make_cli_does_not_add_memory_shell_allowance_for_codex() -> None:
+    svc = _make_service(working_dir="/private/workspace")
+    with patch("ductor_bot.cli.service.create_cli") as mock_create:
+        svc._make_cli(
+            AgentRequest(
+                prompt="hi",
+                provider_override="codex",
+                model_override="gpt-5.6-sol",
+                runtime_env=(("DUCTOR_MEMORY_CAPABILITY", "turn-secret"),),
+            )
+        )
+    assert mock_create.call_args.args[0].allowed_tools == []
+
+
 def test_docker_enabled_property() -> None:
     assert _make_service().docker_enabled is False
     assert _make_service(docker_container="ductor-sandbox").docker_enabled is True

@@ -282,6 +282,11 @@ class InternalAgentAPI:
             logger.exception("Structured memory operation failed")
             result = {"success": False, "error": "Memory operation failed"}
             status = 500
+        logger.info(
+            "Structured memory action=%s success=%s",
+            data.get("action", "unknown"),
+            result.get("success", False),
+        )
         return web.json_response(result, status=status)
 
     # -- Task endpoints ----------------------------------------------------------
