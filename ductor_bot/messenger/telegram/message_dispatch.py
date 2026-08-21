@@ -266,7 +266,7 @@ async def run_voice_message(dispatch: VoiceDispatch) -> str:
         await tracker.set_thinking()
         status = await dispatch.bot.send_message(
             chat_id=dispatch.key.chat_id,
-            text="Klima AI is thinking…",
+            text="Emily is thinking…",
             message_thread_id=dispatch.thread_id,
         )
         async with TypingContext(dispatch.bot, dispatch.key.chat_id, thread_id=dispatch.thread_id):
@@ -279,7 +279,7 @@ async def run_voice_message(dispatch: VoiceDispatch) -> str:
             await dispatch.bot.edit_message_text(
                 chat_id=dispatch.key.chat_id,
                 message_id=status.message_id,
-                text="Klima AI is preparing a voice reply…",
+                text="Emily is preparing a voice reply…",
             )
 
         try:

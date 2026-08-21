@@ -167,7 +167,7 @@ def _help_line(command: str) -> str:
     return f"/{command} -- {description}" if description else f"/{command}"
 
 
-def _build_help_text(*, admin: bool = True, public_name: str = "Klima AI") -> str:
+def _build_help_text(*, admin: bool = True, public_name: str = "Emily") -> str:
     if not admin:
         return fmt(
             f"**{public_name}**",
@@ -264,7 +264,7 @@ class TelegramBot:
             else config.telegram_roles_enabled
         )
         self._admin_users = set(config.admin_user_ids) if self._roles_enabled else set(allowed)
-        self._public_name = config.public_name.strip() or "Klima AI"
+        self._public_name = config.public_name.strip() or "Emily"
         paths = resolve_paths(config.ductor_home)
         self._reply_modes, self._speech, self._transcriber = _build_audio_services(config, paths)
         self._allowed_groups = allowed_groups
@@ -1790,7 +1790,7 @@ class TelegramBot:
             return
 
         # Private-chat scopes ensure admins see the full operational menu while
-        # normal users see only the public Klima AI controls. Setting every
+        # normal users see only the public assistant controls. Setting every
         # allowlisted user also overwrites any stale role scope after changes.
         for user_id in self._allowed_users:
             await self._sync_user_command_scope(user_id)
