@@ -21,6 +21,7 @@ def _parser() -> argparse.ArgumentParser:
 
     search = subparsers.add_parser("search", help="Find current-chat memories")
     search.add_argument("query", nargs="?", default="")
+    search.add_argument("--include-superseded", action="store_true")
 
     for action in ("update", "supersede"):
         command = subparsers.add_parser(action, help=f"{action.title()} a durable fact")
@@ -35,7 +36,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def _payload(args: argparse.Namespace) -> dict[str, object]:
     payload: dict[str, object] = {"action": args.action}
-    for name in ("memory_id", "content", "category", "query"):
+    for name in ("memory_id", "content", "category", "query", "include_superseded"):
         value = getattr(args, name, None)
         if value is not None:
             payload[name] = value

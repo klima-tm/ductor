@@ -40,7 +40,13 @@ _TOOLS = [
         "description": "Search active durable memories for the current user before changing one.",
         "inputSchema": {
             "type": "object",
-            "properties": {"query": {"type": "string"}},
+            "properties": {
+                "query": {"type": "string"},
+                "include_superseded": {
+                    "type": "boolean",
+                    "description": "Include historical records; use for explicit deletion.",
+                },
+            },
             "additionalProperties": False,
         },
     },

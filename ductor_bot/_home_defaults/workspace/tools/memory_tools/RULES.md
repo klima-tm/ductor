@@ -17,13 +17,15 @@ Python commands below.
 ```bash
 python3 tools/memory_tools/memory.py add --category preference "The user prefers concise answers"
 python3 tools/memory_tools/memory.py search "concise answers"
+python3 tools/memory_tools/memory.py search --include-superseded "concise answers"
 python3 tools/memory_tools/memory.py update MEMORY_ID "Corrected fact"
 python3 tools/memory_tools/memory.py supersede MEMORY_ID "Replacement fact"
 python3 tools/memory_tools/memory.py forget MEMORY_ID
 ```
 
 - Use `add` for a new durable fact.
-- Use `search` before changing or forgetting an existing fact.
+- Use `search` before changing an existing fact. For explicit deletion, search
+  with `--include-superseded` so historical versions can also be removed.
 - Use `update` for a correction that does not need historical preservation.
 - Use `supersede` when a previously true fact changed; this preserves the old
   fact as historical and creates an active replacement.

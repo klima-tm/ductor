@@ -79,6 +79,14 @@ def test_tool_call_maps_to_capability_api(
     assert response["result"]["structuredContent"]["success"] is True
 
 
+def test_search_exposes_explicit_historical_option(memory_mcp: ModuleType) -> None:
+    listed = memory_mcp.handle_request(  # type: ignore[attr-defined]
+        {"jsonrpc": "2.0", "id": 4, "method": "tools/list"}
+    )
+    search = next(tool for tool in listed["result"]["tools"] if tool["name"] == "memory_search")
+    assert search["inputSchema"]["properties"]["include_superseded"]["type"] == "boolean"
+
+
 def test_unknown_tool_is_rejected(memory_mcp: ModuleType) -> None:
     response = memory_mcp.handle_request(  # type: ignore[attr-defined]
         {

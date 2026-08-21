@@ -116,7 +116,8 @@ def memory_system_prompt(
         "user to say 'remember'. Never edit the profile file directly. Do not save "
         "secrets, guesses, or temporary chatter. Search before updating, superseding, "
         "or forgetting a fact. Use forget only when the user explicitly requests "
-        "deletion. You may say or imply that something was noted, saved, remembered, "
+        "deletion; when forgetting, search historical/superseded records too. You may "
+        "say or imply that something was noted, saved, remembered, "
         "updated, or forgotten only after the tool returns success.\n"
         f"{runtime_tool_rules}"
     )

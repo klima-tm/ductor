@@ -38,6 +38,7 @@ def test_add_search_update_supersede_and_forget(tmp_path: Path) -> None:
     assert replacement.status == "active"
     assert store.search("detailed") == [replacement]
     assert store.search("concise") == []
+    assert store.search("concise", include_superseded=True) == [old]
     assert "superseded" in target.read_text(encoding="utf-8")
 
     forgotten = store.forget(replacement.memory_id)

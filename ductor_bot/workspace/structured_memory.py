@@ -158,9 +158,14 @@ class StructuredMemoryStore:
         with self._lock:
             return self._records(self._read(), include_superseded=include_superseded)
 
-    def search(self, query: str = "") -> list[MemoryRecord]:
+    def search(
+        self,
+        query: str = "",
+        *,
+        include_superseded: bool = False,
+    ) -> list[MemoryRecord]:
         normalized = re.sub(r"\s+", " ", query).strip().casefold()
-        records = self.all()
+        records = self.all(include_superseded=include_superseded)
         if not normalized:
             return records
         terms = normalized.split()
@@ -373,7 +378,10 @@ class MemoryCapabilityRegistry:
             record = store.forget(payload.get("memory_id"))
             return {"success": True, "action": "forgotten", "memory_id": record.memory_id}
         if action == "search":
-            records = store.search(str(payload.get("query", "")))
+            records = store.search(
+                str(payload.get("query", "")),
+                include_superseded=bool(payload.get("include_superseded", False)),
+            )
             return {
                 "success": True,
                 "action": "searched",
