@@ -75,7 +75,7 @@ from ductor_bot.messenger.telegram.sender import SendRichOpts, send_rich
 from ductor_bot.messenger.telegram.sender import (
     send_files_from_text as _send_files_from_text,
 )
-from ductor_bot.messenger.telegram.speech import ElevenLabsSpeech, ReplyModeStore
+from ductor_bot.messenger.telegram.speech import ElevenLabsSpeech, ReplyMode, ReplyModeStore
 from ductor_bot.messenger.telegram.topic import (
     TopicNameCache,
     get_session_key,
@@ -133,7 +133,7 @@ def _telegram_bot_commands(command_defs: list[tuple[str, str]]) -> list[BotComma
     )
     commands.insert(
         interrupt_index + 1,
-        BotCommand(command="reply", description="Switch voice/text replies"),
+        BotCommand(command="reply", description="Toggle voice/text replies"),
     )
     return commands
 
@@ -145,7 +145,7 @@ _USER_COMMAND_NAMES = frozenset({"start", "reply", "help"})
 _CMD_DESC: dict[str, str] = {
     **dict(_COMMAND_DEFS),
     **dict(_MA_SUB_DEFS),
-    "reply": "Switch voice/text replies",
+    "reply": "Toggle voice/text replies",
 }
 
 
@@ -158,7 +158,7 @@ def _rebuild_commands() -> None:
     ma_defs = get_multiagent_sub_commands()
     _BOT_COMMANDS = _telegram_bot_commands(cmd_defs)
     _CMD_DESC.clear()
-    _CMD_DESC.update({**dict(cmd_defs), **dict(ma_defs), "reply": "Switch voice/text replies"})
+    _CMD_DESC.update({**dict(cmd_defs), **dict(ma_defs), "reply": "Toggle voice/text replies"})
 
 
 def _help_line(command: str) -> str:
@@ -1059,24 +1059,23 @@ class TelegramBot:
         )
 
     async def _on_reply_mode(self, message: Message) -> None:
-        """Show or persist the caller's voice/text reply preference."""
+        """Toggle and persist the caller's voice/text reply preference."""
         text = (message.text or "").strip()
         parts = text.split(None, 1)
         chat_id = message.chat.id
         thread_id = get_thread_id(message)
-        current = self._reply_modes.get(chat_id)
-        if len(parts) == 1 or parts[1].strip().lower() not in {"voice", "text"}:
-            response = f"Reply mode: **{current}**\n\nUse `/reply voice` or `/reply text`."
+        if len(parts) > 1:
+            response = "Используй просто /reply — она переключает текст и голос ❤️‍🔥"
         else:
-            mode = parts[1].strip().lower()
-            assert mode in {"voice", "text"}
-            await self._reply_modes.set(chat_id, mode)  # type: ignore[arg-type]
+            current = self._reply_modes.get(chat_id)
+            mode: ReplyMode = "text" if current == "voice" else "voice"
+            await self._reply_modes.set(chat_id, mode)
             if mode == "voice" and not self._speech.configured:
-                response = "Voice mode is saved. I'll use text until voice service is configured."
+                response = "Поняла! Голос пока недоступен, поэтому продолжу текстом ❤️‍🔥"
             elif mode == "voice":
-                response = "Voice replies enabled."
+                response = "Поняла! Дальше отвечаю голосом ❤️‍🔥"
             else:
-                response = "Text replies enabled."
+                response = "Поняла! Дальше отвечаю текстом ❤️‍🔥"
         await send_rich(
             self._bot,
             chat_id,

@@ -338,24 +338,50 @@ class TestOnHelp:
 
 class TestReplyMode:
     @patch("ductor_bot.messenger.telegram.app.send_rich", new_callable=AsyncMock)
-    async def test_reply_text_persists_for_chat(self, mock_send: AsyncMock, tmp_path: Path) -> None:
+    async def test_reply_toggles_and_persists_for_chat(
+        self, mock_send: AsyncMock, tmp_path: Path
+    ) -> None:
         config = AgentConfig(
             telegram_token="test:token",
             allowed_user_ids=[100],
             ductor_home=str(tmp_path),
         )
         tg_bot, _ = _make_tg_bot(config)
-        message = _make_message(chat_id=100, text="/reply text")
+        message = _make_message(chat_id=100, text="/reply")
 
         await tg_bot._on_reply_mode(message)
 
         assert tg_bot._reply_modes.get(100) == "text"
-        assert "Text replies enabled" in mock_send.await_args.args[2]
+        assert mock_send.await_args.args[2] == "Поняла! Дальше отвечаю текстом ❤️‍🔥"
 
         from ductor_bot.messenger.telegram.speech import ReplyModeStore
 
         reloaded = ReplyModeStore(tmp_path / "reply_preferences.json")
         assert reloaded.get(100) == "text"
+
+        await tg_bot._on_reply_mode(message)
+
+        assert tg_bot._reply_modes.get(100) == "voice"
+        assert mock_send.await_args.args[2] == (
+            "Поняла! Голос пока недоступен, поэтому продолжу текстом ❤️‍🔥"
+        )
+
+    @patch("ductor_bot.messenger.telegram.app.send_rich", new_callable=AsyncMock)
+    async def test_reply_arguments_do_not_change_mode(
+        self, mock_send: AsyncMock, tmp_path: Path
+    ) -> None:
+        config = AgentConfig(
+            telegram_token="test:token",
+            allowed_user_ids=[100],
+            ductor_home=str(tmp_path),
+            speech=SpeechConfig(default_reply_mode="text"),
+        )
+        tg_bot, _ = _make_tg_bot(config)
+
+        await tg_bot._on_reply_mode(_make_message(chat_id=100, text="/reply voice"))
+
+        assert tg_bot._reply_modes.get(100) == "text"
+        assert "Используй просто /reply" in mock_send.await_args.args[2]
 
     @patch("ductor_bot.messenger.telegram.app.run_voice_message", new_callable=AsyncMock)
     async def test_configured_default_voice_routes_normal_messages_to_voice(
