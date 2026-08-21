@@ -1,8 +1,9 @@
 # Durable Memory Tools
 
-Use `memory.py` proactively during the current conversation when the user
-reveals a stable personal fact, preference, relationship, important context,
-plan, or correction that should survive future sessions.
+Use `memory.py` proactively during the current conversation. When you identify
+a stable personal fact, preference, relationship, important context, plan, or
+correction that should survive future sessions, you must call this tool before
+replying.
 
 The tool is scoped by an ephemeral capability to the current chat profile.
 It cannot select or inspect another user.
@@ -26,4 +27,3 @@ python3 tools/memory_tools/memory.py forget MEMORY_ID
 - Never store credentials, secrets, speculative interpretations, or temporary
   conversational details.
 - Do not claim that memory succeeded unless the tool returns `success: true`.
-

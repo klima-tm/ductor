@@ -27,8 +27,10 @@ Read `memory_system/CLAUDE/GEMINI/AGENTS.md` for full format and cleanup rules.
 
 - When `DUCTOR_MEMORY_CAPABILITY` is available, use
   `tools/memory_tools/memory.py` for durable facts instead of editing memory
-  files directly. Save meaningful facts proactively; do not wait for a special
-  “remember” phrase.
+  files directly. If the current message contains a new or corrected durable
+  fact, call the tool before replying. Save meaningful facts proactively; do
+  not wait for a special “remember” phrase and do not imply persistence unless
+  the tool returns success.
 - If the structured tool is unavailable, use the legacy
   `memory_system/MAINMEMORY.md` behavior.
 - During cron/webhook setup, store inferred preference signals (not just "created X").
