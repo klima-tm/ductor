@@ -137,6 +137,7 @@ async def _prepare_normal(
             key,
             orch._config.memory_scope,
             include_content=is_new,
+            provider=req_provider,
         )
 
     if is_new:

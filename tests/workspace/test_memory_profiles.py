@@ -86,3 +86,18 @@ def test_invalid_scope_fails_closed(tmp_path: Path) -> None:
     paths = _paths(tmp_path)
     with pytest.raises(ValueError, match="Unsupported memory scope"):
         memory_path(paths, SessionKey.telegram(123), "shared")
+
+
+def test_codex_memory_prompt_requires_native_tools(tmp_path: Path) -> None:
+    paths = _paths(tmp_path)
+    prompt = memory_system_prompt(
+        paths,
+        SessionKey.telegram(123),
+        "chat",
+        include_content=False,
+        provider="codex",
+    )
+    assert "CODEX MEMORY TOOL RULE" in prompt
+    assert "MUST use those native tools" in prompt
+    assert "Never call memory.py from the shell" in prompt
+    assert "Memory tool: python3" not in prompt

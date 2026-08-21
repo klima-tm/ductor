@@ -82,6 +82,7 @@ def memory_system_prompt(
     scope: str,
     *,
     include_content: bool,
+    provider: str = "",
 ) -> str:
     """Build the model-facing boundary and optional durable-memory content."""
     target = ensure_memory_file(paths, key, scope)
@@ -95,6 +96,18 @@ def memory_system_prompt(
         heading = "## AGENT MEMORY"
         boundary = "This is the durable memory file shared by this agent."
     tool = paths.workspace / "tools" / "memory_tools" / "memory.py"
+    runtime_tool_rules = (
+        "CODEX MEMORY TOOL RULE: Native memory_add, memory_search, memory_update, "
+        "memory_supersede, and memory_forget tools are available. You MUST use those "
+        "native tools for memory operations. Never call memory.py from the shell; the "
+        "Codex read-only sandbox cannot reach the memory service from shell commands."
+        if provider == "codex"
+        else (
+            f"Use the Python memory tool: python3 {tool} "
+            "{add|search|update|supersede|forget} ...\n"
+            f"Read {tool.parent / 'AGENTS.md'} for the exact operations."
+        )
+    )
     tool_rules = (
         "REAL-TIME MEMORY CONTRACT: Decide semantically whether the current user "
         "message contains a new or corrected durable personal fact, preference, "
@@ -105,11 +118,7 @@ def memory_system_prompt(
         "or forgetting a fact. Use forget only when the user explicitly requests "
         "deletion. You may say or imply that something was noted, saved, remembered, "
         "updated, or forgotten only after the tool returns success.\n"
-        "Prefer native memory_add, memory_search, memory_update, memory_supersede, "
-        "and memory_forget tools when available. Otherwise use the Python tool.\n"
-        f"Memory tool: python3 {tool} "
-        "{add|search|update|supersede|forget} ...\n"
-        f"Read {tool.parent / 'AGENTS.md'} for the exact operations."
+        f"{runtime_tool_rules}"
     )
     parts = [heading, boundary, f"Memory path: {target}", tool_rules]
     if include_content:
