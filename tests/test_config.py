@@ -40,6 +40,7 @@ def test_agent_config_defaults() -> None:
     assert cfg.telegram_token == ""
     assert cfg.allowed_user_ids == []
     assert cfg.admin_user_ids == []
+    assert cfg.telegram_roles_enabled is None
     assert cfg.public_name == ""
     assert cfg.memory_scope == "agent"
     assert cfg.cron_delivery_retry.enabled is False

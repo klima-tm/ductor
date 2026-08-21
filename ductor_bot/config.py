@@ -508,6 +508,7 @@ class AgentConfig(BaseModel):
     telegram_token: str = ""
     allowed_user_ids: list[int] = Field(default_factory=list)
     admin_user_ids: list[int] = Field(default_factory=list)
+    telegram_roles_enabled: bool | None = None
     public_name: str = ""
     allowed_group_ids: list[int] = Field(default_factory=list)
     allowed_channel_ids: list[int] = Field(default_factory=list)

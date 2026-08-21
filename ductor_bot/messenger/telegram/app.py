@@ -118,19 +118,19 @@ def _telegram_bot_commands(command_defs: list[tuple[str, str]]) -> list[BotComma
     )
     commands.insert(
         interrupt_index + 1,
-        BotCommand(command="reply", description="Voice or text replies"),
+        BotCommand(command="reply", description="Switch voice/text replies"),
     )
     return commands
 
 
 _BOT_COMMANDS: list[BotCommand] = _telegram_bot_commands(_COMMAND_DEFS)
 
-_USER_COMMAND_NAMES = frozenset({"start", "new", "stop", "interrupt", "reply", "help"})
+_USER_COMMAND_NAMES = frozenset({"start", "reply", "help"})
 
 _CMD_DESC: dict[str, str] = {
     **dict(_COMMAND_DEFS),
     **dict(_MA_SUB_DEFS),
-    "reply": "Voice or text replies",
+    "reply": "Switch voice/text replies",
 }
 
 
@@ -143,7 +143,7 @@ def _rebuild_commands() -> None:
     ma_defs = get_multiagent_sub_commands()
     _BOT_COMMANDS = _telegram_bot_commands(cmd_defs)
     _CMD_DESC.clear()
-    _CMD_DESC.update({**dict(cmd_defs), **dict(ma_defs), "reply": "Voice or text replies"})
+    _CMD_DESC.update({**dict(cmd_defs), **dict(ma_defs), "reply": "Switch voice/text replies"})
 
 
 def _help_line(command: str) -> str:
@@ -157,8 +157,7 @@ def _build_help_text(*, admin: bool = True, public_name: str = "Klima AI") -> st
         return fmt(
             f"**{public_name}**",
             SEP,
-            f"{_help_line('new')}\n{_help_line('stop')}\n"
-            f"{_help_line('interrupt')}\n{_help_line('reply')}\n{_help_line('help')}",
+            f"{_help_line('reply')}\n{_help_line('help')}",
         )
     return fmt(
         t("help.header"),
@@ -244,7 +243,11 @@ class TelegramBot:
         allowed_groups = set(config.allowed_group_ids)
         allowed_channels = set(config.allowed_channel_ids)
         self._allowed_users = allowed
-        self._roles_enabled = bool(config.admin_user_ids)
+        self._roles_enabled = (
+            bool(config.admin_user_ids)
+            if config.telegram_roles_enabled is None
+            else config.telegram_roles_enabled
+        )
         self._admin_users = set(config.admin_user_ids) if self._roles_enabled else set(allowed)
         self._public_name = config.public_name.strip() or "Klima AI"
         paths = resolve_paths(config.ductor_home)

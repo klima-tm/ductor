@@ -22,6 +22,7 @@ def _make_config(
     streaming_enabled: bool = True,
     user_ids: list[int] | None = None,
     admin_user_ids: list[int] | None = None,
+    telegram_roles_enabled: bool | None = None,
     public_name: str = "",
     group_mention_only: bool = False,
 ) -> AgentConfig:
@@ -29,6 +30,7 @@ def _make_config(
         telegram_token="test:token",
         allowed_user_ids=user_ids or [100],
         admin_user_ids=admin_user_ids or [],
+        telegram_roles_enabled=telegram_roles_enabled,
         public_name=public_name,
         streaming=StreamingConfig(enabled=streaming_enabled),
         group_mention_only=group_mention_only,
@@ -1394,11 +1396,35 @@ class TestSyncCommands:
         await tg_bot._sync_commands()
 
         public_commands = [cmd for cmd in _BOT_COMMANDS if cmd.command in _USER_COMMAND_NAMES]
+        assert [command.command for command in public_commands] == ["reply", "help"]
         calls = bot_instance.set_my_commands.await_args_list
         assert calls[0].args == (public_commands,)
         scoped = {call.kwargs["scope"].chat_id: call.args[0] for call in calls[1:]}
         assert scoped[100] == _BOT_COMMANDS
         assert scoped[200] == public_commands
+
+    async def test_roles_can_be_enabled_without_a_telegram_admin(self) -> None:
+        from ductor_bot.messenger.telegram.app import _BOT_COMMANDS, _USER_COMMAND_NAMES
+
+        config = _make_config(
+            user_ids=[100, 200],
+            admin_user_ids=[],
+            telegram_roles_enabled=True,
+        )
+        tg_bot, bot_instance = _make_tg_bot(config)
+        bot_instance.get_my_commands = AsyncMock(return_value=[])
+        bot_instance.set_my_commands = AsyncMock()
+        bot_instance.delete_my_commands = AsyncMock()
+
+        await tg_bot._sync_commands()
+
+        public_commands = [cmd for cmd in _BOT_COMMANDS if cmd.command in _USER_COMMAND_NAMES]
+        calls = bot_instance.set_my_commands.await_args_list
+        assert calls[0].args == (public_commands,)
+        scoped = {call.kwargs["scope"].chat_id: call.args[0] for call in calls[1:]}
+        assert scoped == {100: public_commands, 200: public_commands}
+        assert tg_bot._roles_enabled is True
+        assert tg_bot._admin_users == set()
 
     async def test_role_scope_is_deferred_until_new_user_starts_bot(self) -> None:
         from aiogram.types import BotCommandScopeChat

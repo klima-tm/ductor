@@ -88,6 +88,8 @@ Changes take effect on the next CLI invocation (mtime-based cache invalidation, 
 | `transports` | `list[str]` | `[]` | List of transports to run in parallel (e.g. `["telegram", "matrix"]`). When empty, falls back to single `transport` value. |
 | `telegram_token` | `str` | `""` | Telegram bot token (required when `transport=telegram`) |
 | `allowed_user_ids` | `list[int]` | `[]` | Telegram user allowlist (applies in both private and group chats) |
+| `admin_user_ids` | `list[int]` | `[]` | Telegram users allowed to use operational/model commands; ignored when roles are explicitly disabled |
+| `telegram_roles_enabled` | `bool \| None` | `None` | Explicitly enable normal/admin command separation. `true` with an empty admin list makes every allowlisted account a normal user. `None` preserves legacy behavior: roles activate only when `admin_user_ids` is non-empty. |
 | `allowed_group_ids` | `list[int]` | `[]` | Telegram group allowlist (which groups the bot can operate in; default `[]` = no groups, fail-closed). In groups, both the group and the user must be allowlisted |
 | `allowed_channel_ids` | `list[int]` | `[]` | Telegram channel allowlist for join/audit behavior; unauthorized channels are auto-left |
 | `group_mention_only` | `bool` | `false` | Mention/reply gating in group rooms. Telegram: filter only (no auth bypass). Matrix: in non-DM rooms this bypasses `allowed_users` and uses room + mention/reply as gate |
