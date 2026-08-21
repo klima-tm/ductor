@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import yaml
 from aiogram.types import Message
@@ -33,7 +34,7 @@ def _make_message(
     msg.caption_entities = None
     msg.entities = None
     msg.reply_to_message = None
-    msg.answer = MagicMock()
+    msg.answer = AsyncMock()
 
     # Media attributes
     msg.photo = None
@@ -432,6 +433,63 @@ class TestTelegramBuildMediaPrompt:
         )
         prompt = build_media_prompt(info, tmp_path)
         assert "transcribe_audio.py" in prompt
+
+    def test_direct_transcript_prompt_round_trip(self) -> None:
+        from ductor_bot.messenger.telegram.media import (
+            build_transcribed_audio_prompt,
+            extract_transcribed_audio_text,
+        )
+
+        prompt = build_transcribed_audio_prompt("Привет, my name is Egor.")
+        assert extract_transcribed_audio_text(prompt) == "Привет, my name is Egor."
+
+    async def test_voice_is_transcribed_before_model_prompt(self, tmp_path: Path) -> None:
+        from ductor_bot.messenger.telegram.media import (
+            extract_transcribed_audio_text,
+            resolve_media_text,
+        )
+
+        audio_path = tmp_path / "voice.ogg"
+        audio_path.write_bytes(b"ogg")
+        info = MediaInfo(
+            path=audio_path,
+            media_type="audio/ogg",
+            file_name="voice.ogg",
+            caption=None,
+            original_type="voice",
+        )
+        transcriber = MagicMock(configured=True)
+        transcriber.transcribe = AsyncMock(return_value="Привет and hello")
+        message = _make_message(voice=True)
+
+        async def immediate_to_thread(
+            function: Callable[..., object], *args: object, **kwargs: object
+        ) -> object:
+            return function(*args, **kwargs)
+
+        with (
+            patch(
+                "ductor_bot.messenger.telegram.media.download_media",
+                new_callable=AsyncMock,
+                return_value=info,
+            ),
+            patch("ductor_bot.messenger.telegram.media.update_index"),
+            patch(
+                "ductor_bot.messenger.telegram.media.asyncio.to_thread",
+                side_effect=immediate_to_thread,
+            ),
+        ):
+            prompt = await resolve_media_text(
+                MagicMock(),
+                message,
+                tmp_path / "files",
+                tmp_path,
+                transcriber,
+            )
+
+        assert prompt is not None
+        assert extract_transcribed_audio_text(prompt) == "Привет and hello"
+        transcriber.transcribe.assert_awaited_once()
 
     def test_caption(self, tmp_path: Path) -> None:
         from ductor_bot.messenger.telegram.media import build_media_prompt

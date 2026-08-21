@@ -502,10 +502,18 @@ Behavior notes:
 
 | Field | Type | Default | Notes |
 |---|---|---|---|
+| `enabled` | `bool` | `false` | Directly transcribe inbound Telegram voice/audio before the model turn |
+| `provider` | `str` | `"openai"` | Direct transcription provider; currently only `openai` |
+| `api_key_file` | `str` | `""` | Protected credential file read at request time and never exported to provider CLIs |
+| `model_id` | `str` | `"gpt-4o-transcribe"` | OpenAI transcription model |
+| `timeout_seconds` | `float` | `120.0` | Minimum per-request timeout; longer messages receive up to twice their duration, capped at 600 seconds |
+| `max_bytes` | `int` | `26214400` | Maximum uploaded audio size |
 | `audio_command` | `str` | `""` | When set, exported as `DUCTOR_TRANSCRIBE_COMMAND` for `tools/media_tools/transcribe_audio.py` |
 | `video_command` | `str` | `""` | When set, exported as `DUCTOR_VIDEO_TRANSCRIBE_COMMAND` for `tools/media_tools/process_video.py` |
 
-Empty strings keep the bundled fallback chain intact:
+The direct OpenAI request intentionally omits the optional `language` field so
+one message can contain multiple languages. Empty command strings keep the
+model-invoked bundled fallback chain intact:
 
 - audio: external hook -> OpenAI Whisper API -> local `whisper` CLI -> `whisper.cpp`
 - video: external hook -> existing built-in video transcription path

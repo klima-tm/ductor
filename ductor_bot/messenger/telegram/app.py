@@ -51,6 +51,7 @@ from ductor_bot.messenger.telegram.handlers import (
     strip_mention,
 )
 from ductor_bot.messenger.telegram.media import (
+    extract_transcribed_audio_text,
     has_media,
     is_command_for_others,
     is_message_addressed,
@@ -81,6 +82,7 @@ from ductor_bot.messenger.telegram.topic import (
     get_session_key,
     get_thread_id,
 )
+from ductor_bot.messenger.telegram.transcription import OpenAITranscriber
 from ductor_bot.messenger.telegram.typing import TypingContext as _TypingContext
 from ductor_bot.messenger.telegram.welcome import (
     build_welcome_keyboard,
@@ -93,6 +95,7 @@ from ductor_bot.multiagent.bus import AsyncInterAgentResult
 from ductor_bot.session.key import SessionKey
 from ductor_bot.tasks.models import TaskResult
 from ductor_bot.text.response_format import SEP, fmt
+from ductor_bot.workspace.durable_capture import capture_explicit_memory
 from ductor_bot.workspace.paths import DuctorPaths, resolve_paths
 
 if TYPE_CHECKING:
@@ -108,6 +111,20 @@ _CAPTION_LIMIT = 1024
 # Backward-compatible patch points used by tests.
 TypingContext = _TypingContext
 send_files_from_text = _send_files_from_text
+
+
+def _build_audio_services(
+    config: AgentConfig,
+    paths: DuctorPaths,
+) -> tuple[ReplyModeStore, ElevenLabsSpeech, OpenAITranscriber]:
+    return (
+        ReplyModeStore(
+            paths.reply_preferences_path,
+            default_mode=config.speech.default_reply_mode,
+        ),
+        ElevenLabsSpeech(config.speech),
+        OpenAITranscriber(config.transcription),
+    )
 
 
 def _telegram_bot_commands(command_defs: list[tuple[str, str]]) -> list[BotCommand]:
@@ -251,11 +268,7 @@ class TelegramBot:
         self._admin_users = set(config.admin_user_ids) if self._roles_enabled else set(allowed)
         self._public_name = config.public_name.strip() or "Klima AI"
         paths = resolve_paths(config.ductor_home)
-        self._reply_modes = ReplyModeStore(
-            paths.reply_preferences_path,
-            default_mode=config.speech.default_reply_mode,
-        )
-        self._speech = ElevenLabsSpeech(config.speech)
+        self._reply_modes, self._speech, self._transcriber = _build_audio_services(config, paths)
         self._allowed_groups = allowed_groups
         self._allowed_channels = allowed_channels
         self._chat_tracker: ChatTracker | None = None  # set in _on_startup
@@ -1516,6 +1529,22 @@ class TelegramBot:
         thread_id = get_thread_id(message)
         logger.debug("Message text=%s", text[:80])
 
+        memory_input = message.text
+        if memory_input is None and (message.voice or message.audio):
+            memory_input = extract_transcribed_audio_text(text)
+        if memory_input:
+            try:
+                captured = capture_explicit_memory(
+                    self._orch.paths,
+                    key,
+                    self._config.memory_scope,
+                    memory_input,
+                )
+                if captured:
+                    logger.info("Captured %d explicit durable fact(s)", captured)
+            except OSError:
+                logger.warning("Could not persist explicit durable memory", exc_info=True)
+
         # #63: status_reaction (stage-based) wins over seen_reaction (one-shot).
         # Both enabled would fight over the same Telegram emoji slot.
         if self._config.scene.seen_reaction and not self._config.scene.status_reaction:
@@ -1566,7 +1595,11 @@ class TelegramBot:
         if has_media(message):
             paths = self._orch.paths
             media_prompt = await resolve_media_text(
-                self._bot, message, paths.telegram_files_dir, paths.workspace
+                self._bot,
+                message,
+                paths.telegram_files_dir,
+                paths.workspace,
+                self._transcriber,
             )
             if media_prompt is None:
                 return None

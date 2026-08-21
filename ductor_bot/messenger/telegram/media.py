@@ -22,6 +22,8 @@ if TYPE_CHECKING:
     from aiogram import Bot
     from aiogram.types import Message
 
+    from ductor_bot.messenger.telegram.transcription import OpenAITranscriber
+
 logger = logging.getLogger(__name__)
 
 
@@ -135,6 +137,7 @@ async def resolve_media_text(
     message: Message,
     telegram_files_dir: Path,
     workspace: Path,
+    transcriber: OpenAITranscriber | None = None,
 ) -> str | None:
     """Download media from *message*, update index, return agent prompt.
 
@@ -156,6 +159,29 @@ async def resolve_media_text(
         await asyncio.to_thread(update_index, telegram_files_dir)
     except (OSError, yaml.YAMLError):
         logger.warning("Index update failed", exc_info=True)
+
+    if (
+        info.original_type in {"voice", "audio"}
+        and transcriber is not None
+        and transcriber.configured
+    ):
+        from ductor_bot.messenger.telegram.transcription import TranscriptionError
+
+        source = message.voice or message.audio
+        duration = getattr(source, "duration", None)
+        try:
+            transcript = await transcriber.transcribe(
+                info.path,
+                media_type=info.media_type,
+                duration_seconds=duration if isinstance(duration, int) else None,
+            )
+        except TranscriptionError:
+            logger.warning("Inbound audio transcription failed", exc_info=True)
+            await message.answer(
+                "I couldn't transcribe that voice message. Please try again or send it as text."
+            )
+            return None
+        return build_transcribed_audio_prompt(transcript, caption=info.caption)
 
     return build_media_prompt(info, workspace)
 
@@ -284,3 +310,31 @@ def _extract_sticker(msg: Message) -> _MediaTuple | None:
 def build_media_prompt(info: MediaInfo, workspace: Path) -> str:
     """Build the Telegram-specific prompt for a received media file."""
     return _build_media_prompt_generic(info, workspace, transport="Telegram")
+
+
+def build_transcribed_audio_prompt(transcript: str, *, caption: str | None = None) -> str:
+    """Return model input for a voice note transcribed before the model turn."""
+    lines = [
+        "[VOICE MESSAGE TRANSCRIPT]",
+        "The following was transcribed automatically from the user's voice message.",
+        "Treat it as the user's message and answer it directly.",
+        transcript.strip(),
+        "[/VOICE MESSAGE TRANSCRIPT]",
+    ]
+    if caption:
+        lines.extend(["", f"User caption: {caption}"])
+    return "\n".join(lines)
+
+
+def extract_transcribed_audio_text(prompt: str) -> str | None:
+    """Extract the user text from a direct transcription prompt."""
+    start = "[VOICE MESSAGE TRANSCRIPT]"
+    end = "[/VOICE MESSAGE TRANSCRIPT]"
+    if start not in prompt or end not in prompt:
+        return None
+    body = prompt.split(start, 1)[1].split(end, 1)[0]
+    lines = body.strip().splitlines()
+    if len(lines) < 3:
+        return None
+    transcript = "\n".join(lines[2:]).strip()
+    return transcript or None

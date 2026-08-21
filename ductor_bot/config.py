@@ -315,18 +315,31 @@ class WebhookConfig(BaseModel):
 
 
 class TranscriptionConfig(BaseModel):
-    """External transcription hooks for audio + video (#66).
+    """Inbound transcription plus optional external audio/video hooks.
 
-    Empty strings preserve the built-in strategies in the bundled tool
-    scripts (OpenAI Whisper API → local whisper CLI → whisper.cpp).
-    When a value is set, the bot exports it via
+    ``enabled`` activates direct Telegram audio transcription. The API key is
+    read from ``api_key_file`` at request time and never placed in provider
+    subprocess environments. Empty command strings preserve the bundled tool
+    fallback strategies. When a command is set, the bot exports it via
     ``DUCTOR_TRANSCRIBE_COMMAND`` / ``DUCTOR_VIDEO_TRANSCRIBE_COMMAND``
-    and the tool script invokes the external command first (falling
-    back to the built-ins on failure).
+    for model-invoked media tooling.
     """
 
+    enabled: bool = False
+    provider: str = "openai"
+    api_key_file: str = ""
+    model_id: str = "gpt-4o-transcribe"
+    timeout_seconds: float = Field(default=120.0, gt=0)
+    max_bytes: int = Field(default=25 * 1024 * 1024, gt=0)
     audio_command: str = ""
     video_command: str = ""
+
+    @field_validator("provider")
+    @classmethod
+    def _validate_provider(cls, value: str) -> str:
+        if value != "openai":
+            raise ValueError("transcription.provider must be 'openai'")
+        return value
 
 
 class NotificationTarget(BaseModel):

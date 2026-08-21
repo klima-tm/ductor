@@ -137,7 +137,16 @@
         "startup_targets": [{"enabled": false, "chat_id": null, "topic_id": null}],
         "upgrade_targets": [{"enabled": false, "chat_id": null, "topic_id": null}]
     },
-    "transcription": {"audio_command": "", "video_command": ""},
+    "transcription": {
+        "enabled": false,
+        "provider": "openai",
+        "api_key_file": "",
+        "model_id": "gpt-4o-transcribe",
+        "timeout_seconds": 120.0,
+        "max_bytes": 26214400,
+        "audio_command": "",
+        "video_command": ""
+    },
     "timeouts": {
         "normal": 600.0,
         "background": 1800.0,

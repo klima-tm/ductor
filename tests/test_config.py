@@ -15,6 +15,7 @@ from ductor_bot.config import (
     MemoryReflectionConfig,
     ModelRegistry,
     StreamingConfig,
+    TranscriptionConfig,
     deep_merge_config,
     reset_gemini_models,
     update_config_file,
@@ -43,6 +44,8 @@ def test_agent_config_defaults() -> None:
     assert cfg.telegram_roles_enabled is None
     assert cfg.public_name == ""
     assert cfg.memory_scope == "agent"
+    assert cfg.transcription.model_id == "gpt-4o-transcribe"
+    assert cfg.transcription.enabled is False
     assert cfg.cron_delivery_retry.enabled is False
     assert cfg.cron_delivery_retry.interval_seconds == 300
     assert cfg.cron_delivery_retry.max_attempts == 12
@@ -78,6 +81,11 @@ def test_agent_config_rejects_invalid_types() -> None:
 def test_agent_config_rejects_invalid_memory_scope() -> None:
     with pytest.raises(ValidationError, match="memory_scope"):
         AgentConfig(memory_scope="shared")
+
+
+def test_transcription_config_rejects_unknown_provider() -> None:
+    with pytest.raises(ValidationError, match=r"transcription\.provider"):
+        TranscriptionConfig(provider="unknown")
 
 
 # -- deep_merge_config --
