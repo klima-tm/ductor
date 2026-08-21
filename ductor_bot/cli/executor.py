@@ -28,6 +28,13 @@ from ductor_bot.infra.process_tree import force_kill_process_tree
 logger = logging.getLogger(__name__)
 
 
+def _inject_runtime_env(env: dict[str, str], config: CLIConfig) -> None:
+    """Add framework-owned ephemeral variables without exposing arbitrary keys."""
+    env.update(
+        {key: value for key, value in config.runtime_env.items() if key.startswith("DUCTOR_")}
+    )
+
+
 def build_subprocess_env(config: CLIConfig) -> dict[str, str] | None:
     """Build environment dict with agent identification vars.
 
@@ -76,6 +83,7 @@ def build_subprocess_env(config: CLIConfig) -> dict[str, str] | None:
         # Sub-agent home is <main_home>/agents/<name>/
         main_home = ductor_home.parent.parent
         env["DUCTOR_SHARED_MEMORY_PATH"] = str(main_home / "SHAREDMEMORY.md")
+    _inject_runtime_env(env, config)
     return env
 
 

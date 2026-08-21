@@ -17,6 +17,7 @@ This is the navigation index for workspace tools.
 - sub-agent management (create/remove/list/ask) -> `agent_tools/CLAUDE.md`
 - background tasks (delegate, list, cancel) -> `task_tools/CLAUDE/GEMINI/AGENTS.md`
 - custom user scripts -> `user_tools/CLAUDE.md`
+- durable current-chat memory -> `memory_tools/CLAUDE/GEMINI/AGENTS.md`
 
 ## External API Secrets
 
@@ -45,4 +46,5 @@ No tool script needed — just create the file.
 ## Output and Memory
 
 - Save user deliverables in `../output_to_user/`.
-- Update `../memory_system/MAINMEMORY.md` silently for durable user facts/preferences.
+- Use `memory_tools/memory.py` silently for durable user facts/preferences when
+  the current turn exposes a memory capability.

@@ -12,11 +12,14 @@ The server also starts in **task-only mode** (no multi-agent bus) when
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import asdict
 from typing import TYPE_CHECKING
 
 from aiohttp import web
+
+from ductor_bot.workspace.structured_memory import MemoryOperationError, memory_capabilities
 
 if TYPE_CHECKING:
     from ductor_bot.multiagent.bus import InterAgentBus
@@ -84,6 +87,7 @@ class InternalAgentAPI:
         self._app.router.add_get("/tasks/list", self._handle_task_list)
         self._app.router.add_post("/tasks/cancel", self._handle_task_cancel)
         self._app.router.add_post("/tasks/delete", self._handle_task_delete)
+        self._app.router.add_post("/memory/manage", self._handle_memory_manage)
 
         self._runner: web.AppRunner | None = None
 
@@ -248,6 +252,37 @@ class InternalAgentAPI:
                 "last_crash_error": health.last_crash_error or None,
             }
         return web.json_response({"agents": agents})
+
+    async def _handle_memory_manage(self, request: web.Request) -> web.Response:
+        """Execute a structured operation scoped by an ephemeral chat capability."""
+        auth = request.headers.get("Authorization", "")
+        scheme, _, token = auth.partition(" ")
+        if scheme.lower() != "bearer" or not token.strip():
+            return web.json_response(
+                {"success": False, "error": "Memory capability is required"}, status=401
+            )
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"success": False, "error": "Invalid JSON body"}, status=400)
+        if not isinstance(data, dict):
+            return web.json_response(
+                {"success": False, "error": "JSON body must be an object"}, status=400
+            )
+        status = 200
+        try:
+            result = await asyncio.to_thread(memory_capabilities.execute, token.strip(), data)
+        except PermissionError as exc:
+            result = {"success": False, "error": str(exc)}
+            status = 403
+        except (MemoryOperationError, TypeError, ValueError) as exc:
+            result = {"success": False, "error": str(exc)}
+            status = 400
+        except Exception:
+            logger.exception("Structured memory operation failed")
+            result = {"success": False, "error": "Memory operation failed"}
+            status = 500
+        return web.json_response(result, status=status)
 
     # -- Task endpoints ----------------------------------------------------------
 

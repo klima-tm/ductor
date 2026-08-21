@@ -127,6 +127,8 @@ class CLIConfig:
     # External transcription hooks (#66) — empty strings keep built-in strategies.
     transcribe_command: str = ""
     video_transcribe_command: str = ""
+    # Ephemeral framework capabilities for this one provider subprocess.
+    runtime_env: dict[str, str] = field(default_factory=dict)
 
 
 _CONTAINER_DUCTOR_MOUNT = "/ductor"
@@ -220,6 +222,7 @@ def docker_wrap(
         for key in list(merged_extra):
             if key in os.environ:
                 del merged_extra[key]
+        merged_extra.update(config.runtime_env)
         if extra_env:
             merged_extra.update(extra_env)  # Provider-specific overrides win.
         extra_env = merged_extra or None

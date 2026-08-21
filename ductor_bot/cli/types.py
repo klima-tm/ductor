@@ -87,6 +87,7 @@ class AgentRequest:
     continue_session: bool = False
     timeout_seconds: float | None = None
     timeout_controller: TimeoutController | None = None
+    runtime_env: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

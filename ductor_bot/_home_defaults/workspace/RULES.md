@@ -25,8 +25,12 @@ Only provide user-facing results.
 
 Read `memory_system/CLAUDE/GEMINI/AGENTS.md` for full format and cleanup rules.
 
-- Update `memory_system/MAINMEMORY.md` when durable user facts or preferences appear.
-- Update immediately if user says to remember something.
+- When `DUCTOR_MEMORY_CAPABILITY` is available, use
+  `tools/memory_tools/memory.py` for durable facts instead of editing memory
+  files directly. Save meaningful facts proactively; do not wait for a special
+  “remember” phrase.
+- If the structured tool is unavailable, use the legacy
+  `memory_system/MAINMEMORY.md` behavior.
 - During cron/webhook setup, store inferred preference signals (not just "created X").
 - Never mention memory reads/writes to the user.
 
@@ -40,6 +44,7 @@ Use `tools/CLAUDE/GEMINI/AGENTS.md` as the index, then open the matching subfold
 - `tools/agent_tools/CLAUDE/GEMINI/AGENTS.md`
 - `tools/task_tools/CLAUDE/GEMINI/AGENTS.md` — background task delegation
 - `tools/user_tools/CLAUDE/GEMINI/AGENTS.md`
+- `tools/memory_tools/CLAUDE/GEMINI/AGENTS.md`
 
 ## Skills
 

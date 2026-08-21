@@ -19,6 +19,10 @@ At the start of new sessions (especially personal or ongoing work), read `MAINME
 - Repeating workflow patterns
 - Cron/webhook setup signals that imply interests
 
+When `DUCTOR_MEMORY_CAPABILITY` is available, write through
+`tools/memory_tools/memory.py`; do not edit a chat profile directly. The tool
+enforces current-chat isolation and returns whether the operation succeeded.
+
 ## When Not to Write
 
 - One-off throwaway requests

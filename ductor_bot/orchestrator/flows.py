@@ -29,6 +29,7 @@ from ductor_bot.workspace.memory_profiles import (
     memory_system_prompt,
     scope_memory_prompt,
 )
+from ductor_bot.workspace.structured_memory import memory_capabilities
 
 if TYPE_CHECKING:
     from ductor_bot.orchestrator.core import Orchestrator
@@ -158,6 +159,13 @@ async def _prepare_normal(
     )
     prompt = orch._hook_registry.apply(text, hook_ctx)
 
+    memory_capability = memory_capabilities.issue(
+        orch.paths,
+        key,
+        orch._config.memory_scope,
+        source=f"model:{req_provider}",
+    )
+
     timeout_secs = resolve_timeout(orch._config, "normal")
     request = AgentRequest(
         prompt=prompt,
@@ -171,6 +179,7 @@ async def _prepare_normal(
         resume_session=None if is_new else session.session_id,
         timeout_seconds=timeout_secs,
         timeout_controller=_make_timeout_controller(orch, "normal"),
+        runtime_env=(("DUCTOR_MEMORY_CAPABILITY", memory_capability),),
     )
     return request, session
 

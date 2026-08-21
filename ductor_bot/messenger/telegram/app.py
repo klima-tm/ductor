@@ -51,7 +51,6 @@ from ductor_bot.messenger.telegram.handlers import (
     strip_mention,
 )
 from ductor_bot.messenger.telegram.media import (
-    extract_transcribed_audio_text,
     has_media,
     is_command_for_others,
     is_message_addressed,
@@ -95,7 +94,6 @@ from ductor_bot.multiagent.bus import AsyncInterAgentResult
 from ductor_bot.session.key import SessionKey
 from ductor_bot.tasks.models import TaskResult
 from ductor_bot.text.response_format import SEP, fmt
-from ductor_bot.workspace.durable_capture import capture_explicit_memory
 from ductor_bot.workspace.paths import DuctorPaths, resolve_paths
 
 if TYPE_CHECKING:
@@ -1528,22 +1526,6 @@ class TelegramBot:
         key = get_session_key(message)
         thread_id = get_thread_id(message)
         logger.debug("Message text=%s", text[:80])
-
-        memory_input = message.text
-        if memory_input is None and (message.voice or message.audio):
-            memory_input = extract_transcribed_audio_text(text)
-        if memory_input:
-            try:
-                captured = capture_explicit_memory(
-                    self._orch.paths,
-                    key,
-                    self._config.memory_scope,
-                    memory_input,
-                )
-                if captured:
-                    logger.info("Captured %d explicit durable fact(s)", captured)
-            except OSError:
-                logger.warning("Could not persist explicit durable memory", exc_info=True)
 
         # #63: status_reaction (stage-based) wins over seen_reaction (one-shot).
         # Both enabled would fight over the same Telegram emoji slot.

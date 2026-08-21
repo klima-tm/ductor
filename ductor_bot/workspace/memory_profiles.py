@@ -94,7 +94,20 @@ def memory_system_prompt(
     else:
         heading = "## AGENT MEMORY"
         boundary = "This is the durable memory file shared by this agent."
-    parts = [heading, boundary, f"Memory path: {target}"]
+    tool = paths.workspace / "tools" / "memory_tools" / "memory.py"
+    tool_rules = (
+        "Manage durable memory proactively during the conversation through the "
+        "structured current-chat tool; do not wait for the user to say 'remember'. "
+        "Save stable personal facts, preferences, relationships, important context, "
+        "plans, and corrections. Do not save secrets, guesses, or temporary chatter. "
+        "Search before updating, superseding, or forgetting a fact. Use forget only "
+        "when the user explicitly requests deletion. Never claim a memory write "
+        "succeeded unless the tool returned success.\n"
+        f"Memory tool: python3 {tool} "
+        "{add|search|update|supersede|forget} ...\n"
+        f"Read {tool.parent / 'RULES.md'} for the exact operations."
+    )
+    parts = [heading, boundary, f"Memory path: {target}", tool_rules]
     if include_content:
         content = read_file(target) or ""
         if content.strip():

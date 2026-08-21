@@ -74,6 +74,21 @@ async def test_normal_new_session_injects_mainmemory(orch: Orchestrator) -> None
     assert request.resume_session is None  # New session
 
 
+async def test_normal_issues_ephemeral_memory_capability(orch: Orchestrator) -> None:
+    orch._config.memory_scope = "chat"
+    mock_execute = AsyncMock(return_value=_mock_response())
+    object.__setattr__(orch._cli_service, "execute", mock_execute)
+
+    await normal(orch, SessionKey.telegram(101), "Hello")
+    await normal(orch, SessionKey.telegram(202), "Hello")
+
+    first = dict(mock_execute.call_args_list[0][0][0].runtime_env)
+    second = dict(mock_execute.call_args_list[1][0][0].runtime_env)
+    assert first["DUCTOR_MEMORY_CAPABILITY"]
+    assert second["DUCTOR_MEMORY_CAPABILITY"]
+    assert first != second
+
+
 async def test_normal_chat_memory_isolated_between_chats(orch: Orchestrator) -> None:
     orch._config.memory_scope = "chat"
     first_key = SessionKey.telegram(101)

@@ -74,6 +74,9 @@ def test_chat_system_prompt_names_boundary_and_exact_path(tmp_path: Path) -> Non
     assert "never inspect sibling profiles" in prompt
     assert str(target) in prompt
     assert "likes tea" in prompt
+    assert "structured current-chat tool" in prompt
+    assert "memory_tools/memory.py" in prompt
+    assert "do not wait for the user to say 'remember'" in prompt
 
 
 def test_invalid_scope_fails_closed(tmp_path: Path) -> None:

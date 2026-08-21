@@ -342,6 +342,18 @@ def test_make_cli_no_override_leaves_append_prompt_untouched() -> None:
     assert cli_config.append_system_prompt == "MEMORY DUMP"
 
 
+def test_make_cli_passes_ephemeral_runtime_environment() -> None:
+    svc = _make_service()
+    with patch("ductor_bot.cli.service.create_cli") as mock_create:
+        svc._make_cli(
+            AgentRequest(
+                prompt="hi",
+                runtime_env=(("DUCTOR_MEMORY_CAPABILITY", "turn-secret"),),
+            )
+        )
+    assert mock_create.call_args.args[0].runtime_env == {"DUCTOR_MEMORY_CAPABILITY": "turn-secret"}
+
+
 def test_docker_enabled_property() -> None:
     assert _make_service().docker_enabled is False
     assert _make_service(docker_container="ductor-sandbox").docker_enabled is True

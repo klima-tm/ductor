@@ -552,23 +552,6 @@ class TestOnRestart:
 
 
 class TestOnMessage:
-    async def test_captures_explicit_memory_before_reply(self) -> None:
-        tg_bot, _ = _make_tg_bot()
-        tg_bot._orchestrator = _make_orchestrator()
-        msg = _make_message(text="My name is Egor")
-
-        with (
-            patch(
-                "ductor_bot.messenger.telegram.app.capture_explicit_memory",
-                return_value=1,
-            ) as capture,
-            patch.object(tg_bot, "_handle_streaming", new_callable=AsyncMock),
-        ):
-            await tg_bot._on_message(msg)
-
-        capture.assert_called_once()
-        assert capture.call_args.args[3] == "My name is Egor"
-
     async def test_routes_text_to_non_streaming(self) -> None:
         config = _make_config(streaming_enabled=False)
         tg_bot, _bot_instance = _make_tg_bot(config)

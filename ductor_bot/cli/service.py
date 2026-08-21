@@ -419,6 +419,7 @@ class CLIService:
                 interagent_port=self._config.interagent_port,
                 transcribe_command=self._config.transcribe_command,
                 video_transcribe_command=self._config.video_transcribe_command,
+                runtime_env=dict(request.runtime_env),
             )
         )
 

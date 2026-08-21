@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -10,6 +11,9 @@ from aiohttp.test_utils import TestClient
 from ductor_bot.multiagent.bus import InterAgentBus
 from ductor_bot.multiagent.health import AgentHealth
 from ductor_bot.multiagent.internal_api import InternalAgentAPI, _normalise_transport
+from ductor_bot.session import SessionKey
+from ductor_bot.workspace.paths import DuctorPaths
+from ductor_bot.workspace.structured_memory import memory_capabilities
 
 
 @pytest.fixture
@@ -249,6 +253,48 @@ class TestHandleHealth:
         assert data["agents"]["sub1"]["status"] == "crashed"
         assert data["agents"]["sub1"]["last_crash_error"] == "OOM"
         assert data["agents"]["sub1"]["restart_count"] == 1
+
+
+class TestMemoryManage:
+    async def test_requires_capability(self, client: TestClient) -> None:
+        resp = await client.post("/memory/manage", json={"action": "search"})
+        assert resp.status == 401
+
+    async def test_add_and_search_are_chat_scoped(self, client: TestClient, tmp_path: Path) -> None:
+        memory_capabilities.clear()
+        paths = DuctorPaths(tmp_path / "home")
+        token = memory_capabilities.issue(
+            paths,
+            SessionKey.telegram(123),
+            "chat",
+            source="model:claude",
+        )
+        headers = {"Authorization": f"Bearer {token}"}
+        added = await client.post(
+            "/memory/manage",
+            headers=headers,
+            json={"action": "add", "content": "The user likes tea", "category": "preference"},
+        )
+        assert added.status == 200
+        result = await added.json()
+        assert result["success"] is True
+
+        searched = await client.post(
+            "/memory/manage",
+            headers=headers,
+            json={"action": "search", "query": "tea"},
+        )
+        assert searched.status == 200
+        result = await searched.json()
+        assert [item["content"] for item in result["memories"]] == ["The user likes tea"]
+
+    async def test_rejects_invalid_capability(self, client: TestClient) -> None:
+        resp = await client.post(
+            "/memory/manage",
+            headers={"Authorization": "Bearer invalid"},
+            json={"action": "search"},
+        )
+        assert resp.status == 403
 
 
 class TestHandleTaskCancel:
