@@ -115,8 +115,6 @@ class CodexCLI(BaseCLI):
         # subcommand.  Codex 0.147 rejects `--sandbox` after `resume`.
         cmd = [self._cli, "exec"]
         cmd += self._sandbox_flags()
-        if cfg.cli_parameters:
-            cmd.extend(cfg.cli_parameters)
         cmd.append("resume")
         if json_output:
             cmd.append("--json")
@@ -131,6 +129,11 @@ class CodexCLI(BaseCLI):
             cmd += ["--model", cfg.model]
         if cfg.reasoning_effort and cfg.reasoning_effort != "default":
             cmd += ["-c", f"model_reasoning_effort={cfg.reasoning_effort}"]
+        # Config overrides for a resumed invocation belong to the `resume`
+        # subcommand. Placing MCP overrides before `resume` parses successfully
+        # but silently omits those tools from the resumed turn.
+        if cfg.cli_parameters:
+            cmd.extend(cfg.cli_parameters)
         cmd += ["--", session_id]
         cmd.append("-")
         return cmd

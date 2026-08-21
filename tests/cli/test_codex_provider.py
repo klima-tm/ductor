@@ -1381,7 +1381,7 @@ class TestResumeCommandArgOrder:
         # Images are not added to resume commands
         assert "--image" not in cmd
 
-    def test_resume_includes_cli_parameters_before_subcommand(
+    def test_resume_includes_cli_parameters_on_resume_subcommand(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         cli = _make_cli(
@@ -1390,10 +1390,12 @@ class TestResumeCommandArgOrder:
         )
         cmd = cli._build_command("go", resume_session="th-1")
         resume_index = cmd.index("resume")
-        assert cmd[resume_index - 2 : resume_index] == [
+        config_value_index = cmd.index('mcp_servers.memory.command="python3"')
+        assert cmd[config_value_index - 1 : config_value_index + 1] == [
             "-c",
             'mcp_servers.memory.command="python3"',
         ]
+        assert config_value_index > resume_index
 
 
 class TestStreamingContinueSessionIgnored:
