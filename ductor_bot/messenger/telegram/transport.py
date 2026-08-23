@@ -217,7 +217,9 @@ class TelegramTransport:
 
     async def _deliver_webhook_wake(self, env: Envelope) -> None:
         """Deliver a proactive agent reply using the chat's sticky reply mode."""
-        if env.result_text:
+        from ductor_bot.instagram import NO_REACTION_TOKEN
+
+        if env.result_text and env.result_text.strip() != NO_REACTION_TOKEN:
             await self._deliver_user_reply(env)
 
     async def _deliver_user_reply(self, env: Envelope) -> None:

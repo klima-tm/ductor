@@ -206,7 +206,8 @@ Main chat:  "Ask codex-agent to write tests for the API"
 - **Webhooks** — `wake` (inject into active chat) and `cron_task` (isolated task run) modes
 - **Heartbeat** — proactive checks with per-target settings, group/topic support, chat validation
 - **Instagram monitor** — optional HikerAPI polling for new posts, reels, and stories with
-  deduplication, real-media inspection, and proactive delivery to one allowlisted chat
+  deduplication, real-media inspection, model discretion, and at most one proactive message
+  per local calendar day to one allowlisted chat
 - **Image processing** — auto-resize and WebP conversion for incoming images (configurable)
 - **Media transcription hooks** — configurable external audio/video transcription commands for bundled media tools
 - **Notification routing** — startup/upgrade lifecycle messages can target specific chats/topics

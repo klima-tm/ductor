@@ -480,11 +480,14 @@ Applied to incoming images across all transports (Telegram, Matrix, API). See `f
 
 ## `InstagramMonitorConfig`
 
-The monitor deterministically polls HikerAPI and wakes the configured chat only
-when it sees a new Instagram media ID. The first successful poll seeds existing
-content without sending it. Downloaded images/videos are placed under
-`workspace/instagram_files/` for actual model inspection. The HikerAPI key is
-read from a protected file and is never exported to model subprocesses.
+The monitor deterministically polls HikerAPI when it sees new Instagram media
+IDs. The first successful poll seeds existing content without sending it.
+Downloaded images/videos are placed under `workspace/instagram_files/` for
+actual model inspection. The model may decline with a private sentinel when the
+material does not deserve a natural reaction. At most one proactive message is
+delivered per calendar day in `user_timezone`; later items that day are recorded
+without another model turn. The HikerAPI key is read from a protected file and
+is never exported to model subprocesses.
 
 | Field | Type | Default | Notes |
 |---|---|---|---|
@@ -500,8 +503,9 @@ read from a protected file and is never exported to model subprocesses.
 
 The monitor reads public-profile data. It downloads only HTTPS media from
 Instagram CDN hosts, caps resource size, treats captions as untrusted content,
-and retries an item if generation or delivery returns no response. Proactive
-Telegram replies honor the chat's sticky voice/text preference.
+and retries an evaluation if generation returns no response. Up to five new
+items found in one poll are evaluated together, producing zero or one message.
+Proactive Telegram replies honor the chat's sticky voice/text preference.
 
 ## `NotificationsConfig`
 

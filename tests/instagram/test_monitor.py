@@ -7,17 +7,19 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+import time_machine
 from aiohttp import web
 from pydantic import ValidationError
 
 from ductor_bot.config import AgentConfig, InstagramMonitorConfig
+from ductor_bot.infra.json_store import load_json
 from ductor_bot.instagram.client import (
     HikerAPIClient,
     HikerAPIError,
     InstagramItem,
     _media_descriptors,
 )
-from ductor_bot.instagram.observer import InstagramObserver
+from ductor_bot.instagram.observer import NO_REACTION_TOKEN, InstagramObserver
 from ductor_bot.workspace.paths import DuctorPaths
 
 
@@ -186,9 +188,86 @@ async def test_new_item_wakes_once_with_real_media_path(tmp_path: Path) -> None:
     assert await observer.poll_once() == 0
     wake.assert_awaited_once()
     prompt = wake.await_args.args[1]
-    assert "new Instagram reel" in prompt
+    assert "ITEM 1 — reel" in prompt
     assert str(media) in prompt
+    assert NO_REACTION_TOKEN in prompt
     assert "Return only the message for Anya" in prompt
+
+
+async def test_multiple_new_items_are_evaluated_in_one_turn(tmp_path: Path) -> None:
+    media = tmp_path / "media.jpg"
+    media.write_bytes(b"image")
+    client = FakeClient([_item("old")], media)
+    observer = InstagramObserver(
+        _config(tmp_path),
+        DuctorPaths(ductor_home=tmp_path),
+        client=client,  # type: ignore[arg-type]
+    )
+    wake = AsyncMock(return_value="What a view 😍")
+    observer.set_wake_handler(wake)
+    await observer.poll_once()
+    client.items.extend(
+        [
+            _item("new-1", kind="story", taken_at="2026-08-21T11:00:00Z"),
+            _item("new-2", kind="reel", taken_at="2026-08-21T11:01:00Z"),
+        ]
+    )
+
+    assert await observer.poll_once() == 1
+    wake.assert_awaited_once()
+    prompt = wake.await_args.args[1]
+    assert "ITEM 1 — story" in prompt
+    assert "ITEM 2 — reel" in prompt
+
+
+async def test_no_reaction_keeps_daily_opportunity_open(tmp_path: Path) -> None:
+    media = tmp_path / "media.jpg"
+    media.write_bytes(b"image")
+    client = FakeClient([_item("old")], media)
+    observer = InstagramObserver(
+        _config(tmp_path),
+        DuctorPaths(ductor_home=tmp_path),
+        client=client,  # type: ignore[arg-type]
+    )
+    wake = AsyncMock(return_value=NO_REACTION_TOKEN)
+    observer.set_wake_handler(wake)
+
+    with time_machine.travel("2026-08-23 12:00:00+00:00"):
+        await observer.poll_once()
+        client.items.append(_item("ordinary"))
+        assert await observer.poll_once() == 0
+        wake.return_value = "Вот это уже сильно 😈"
+        client.items.append(_item("worth-it", taken_at="2026-08-23T12:05:00Z"))
+        assert await observer.poll_once() == 1
+
+    assert wake.await_count == 2
+
+
+async def test_daily_cap_observes_later_items_without_another_turn(tmp_path: Path) -> None:
+    media = tmp_path / "media.jpg"
+    media.write_bytes(b"image")
+    client = FakeClient([_item("old")], media)
+    paths = DuctorPaths(ductor_home=tmp_path)
+    observer = InstagramObserver(
+        _config(tmp_path),
+        paths,
+        client=client,  # type: ignore[arg-type]
+    )
+    wake = AsyncMock(return_value="Красота ❤️‍🔥")
+    observer.set_wake_handler(wake)
+
+    with time_machine.travel("2026-08-23 12:00:00+00:00"):
+        await observer.poll_once()
+        client.items.append(_item("first"))
+        assert await observer.poll_once() == 1
+        client.items.append(_item("later", taken_at="2026-08-23T16:00:00Z"))
+        assert await observer.poll_once() == 0
+
+    wake.assert_awaited_once()
+    state = load_json(paths.instagram_monitor_state_path)
+    assert state is not None
+    assert state["last_reaction_date"] == "2026-08-23"
+    assert "post:later" in state["seen"]
 
 
 async def test_failed_wake_is_retried_and_not_marked_seen(tmp_path: Path) -> None:
