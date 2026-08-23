@@ -168,6 +168,10 @@ async def _prepare_normal(
     )
 
     timeout_secs = resolve_timeout(orch._config, "normal")
+    runtime_env = [("DUCTOR_MEMORY_CAPABILITY", memory_capability)]
+    if orch._config.shared_context_file:
+        runtime_env.append(("DUCTOR_SHARED_CONTEXT_FILE", orch._config.shared_context_file))
+
     request = AgentRequest(
         prompt=prompt,
         append_system_prompt=append_prompt,
@@ -180,7 +184,7 @@ async def _prepare_normal(
         resume_session=None if is_new else session.session_id,
         timeout_seconds=timeout_secs,
         timeout_controller=_make_timeout_controller(orch, "normal"),
-        runtime_env=(("DUCTOR_MEMORY_CAPABILITY", memory_capability),),
+        runtime_env=tuple(runtime_env),
     )
     return request, session
 

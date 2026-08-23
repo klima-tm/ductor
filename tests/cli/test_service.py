@@ -400,6 +400,52 @@ def test_make_cli_does_not_add_memory_shell_allowance_for_codex() -> None:
     ]
 
 
+def test_make_cli_adds_read_only_context_command_for_claude() -> None:
+    svc = _make_service(working_dir="/private/workspace")
+    with patch("ductor_bot.cli.service.create_cli") as mock_create:
+        svc._make_cli(
+            AgentRequest(
+                prompt="hi",
+                provider_override="claude",
+                model_override="opus",
+                runtime_env=(("DUCTOR_SHARED_CONTEXT_FILE", "/approved/context.json"),),
+            )
+        )
+    assert mock_create.call_args.args[0].allowed_tools == [
+        "Bash(python3 tools/context_tools/context.py *)",
+        "Bash(python3 /private/workspace/tools/context_tools/context.py *)",
+    ]
+
+
+def test_make_cli_adds_read_only_context_mcp_for_codex() -> None:
+    svc = _make_service(working_dir="/private/workspace")
+    with patch("ductor_bot.cli.service.create_cli") as mock_create:
+        svc._make_cli(
+            AgentRequest(
+                prompt="hi",
+                provider_override="codex",
+                model_override="gpt-5.6-sol",
+                runtime_env=(("DUCTOR_SHARED_CONTEXT_FILE", "/approved/context.json"),),
+            )
+        )
+    assert mock_create.call_args.args[0].allowed_tools == []
+    assert mock_create.call_args.args[0].cli_parameters == [
+        "-c",
+        'mcp_servers.egor_context.command="python3"',
+        "-c",
+        'mcp_servers.egor_context.args=["/private/workspace/tools/context_tools/context_mcp.py"]',
+        "-c",
+        'mcp_servers.egor_context.env_vars=["DUCTOR_SHARED_CONTEXT_FILE"]',
+        "-c",
+        "mcp_servers.egor_context.enabled_tools=['get_current_work', 'get_goals', "
+        "'get_schedule', 'get_diet', 'search_shared_context']",
+        "-c",
+        'mcp_servers.egor_context.default_tools_approval_mode="approve"',
+        "-c",
+        "mcp_servers.egor_context.required=true",
+    ]
+
+
 def test_docker_enabled_property() -> None:
     assert _make_service().docker_enabled is False
     assert _make_service(docker_container="ductor-sandbox").docker_enabled is True

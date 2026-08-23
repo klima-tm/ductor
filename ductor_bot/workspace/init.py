@@ -31,6 +31,7 @@ _ZONE2_PY_DIRS = frozenset(
         "workspace/tools/agent_tools",
         "workspace/tools/task_tools",
         "workspace/tools/memory_tools",
+        "workspace/tools/context_tools",
         # media_tools scripts consume framework env-vars
         # (DUCTOR_TRANSCRIBE_COMMAND, DUCTOR_VIDEO_TRANSCRIBE_COMMAND) — keep
         # them framework-managed so v0.16.0 users inherit the configurable
@@ -324,6 +325,7 @@ _REQUIRED_DIRS = (
     "workspace/tools/webhook_tools",
     "workspace/tools/agent_tools",
     "workspace/tools/memory_tools",
+    "workspace/tools/context_tools",
     "workspace/output_to_user",
     "workspace/tasks",
     "workspace/skills",

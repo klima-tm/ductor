@@ -15,6 +15,7 @@
     "max_turns": null,
     "max_session_messages": null,
     "memory_scope": "agent",
+    "shared_context_file": "",
     "permission_mode": "bypassPermissions",
     "cli_timeout": 600.0,
     "reasoning_effort": "medium",

@@ -54,6 +54,11 @@ def test_agent_config_defaults() -> None:
     assert cfg.cron_preflight.skip_marker == "HEARTBEAT_OK"
 
 
+def test_shared_context_file_must_be_absolute() -> None:
+    with pytest.raises(ValidationError, match="shared_context_file must be an absolute path"):
+        AgentConfig(shared_context_file="relative/context.json")
+
+
 def test_agent_config_normalizes_nullish_gemini_api_key() -> None:
     assert AgentConfig(gemini_api_key="null").gemini_api_key is None
     assert AgentConfig(gemini_api_key=" NONE ").gemini_api_key is None

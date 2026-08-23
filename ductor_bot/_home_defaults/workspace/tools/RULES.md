@@ -18,6 +18,7 @@ This is the navigation index for workspace tools.
 - background tasks (delegate, list, cancel) -> `task_tools/CLAUDE/GEMINI/AGENTS.md`
 - custom user scripts -> `user_tools/CLAUDE.md`
 - durable current-chat memory -> `memory_tools/CLAUDE/GEMINI/AGENTS.md`
+- approved administrator context -> `context_tools/CLAUDE/GEMINI/AGENTS.md`
 
 ## External API Secrets
 

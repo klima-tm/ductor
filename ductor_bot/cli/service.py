@@ -432,6 +432,43 @@ class CLIService:
                 ]
             )
 
+        shared_context_file = dict(request.runtime_env).get("DUCTOR_SHARED_CONTEXT_FILE")
+        if provider == "claude" and shared_context_file:
+            context_tool = Path(self._config.working_dir) / "tools" / "context_tools" / "context.py"
+            allowed_tools.extend(
+                [
+                    "Bash(python3 tools/context_tools/context.py *)",
+                    f"Bash(python3 {context_tool} *)",
+                ]
+            )
+        if provider == "codex" and shared_context_file:
+            context_mcp = (
+                Path(self._config.working_dir) / "tools" / "context_tools" / "context_mcp.py"
+            )
+            context_tools = [
+                "get_current_work",
+                "get_goals",
+                "get_schedule",
+                "get_diet",
+                "search_shared_context",
+            ]
+            cli_parameters.extend(
+                [
+                    "-c",
+                    'mcp_servers.egor_context.command="python3"',
+                    "-c",
+                    f'mcp_servers.egor_context.args=["{context_mcp}"]',
+                    "-c",
+                    'mcp_servers.egor_context.env_vars=["DUCTOR_SHARED_CONTEXT_FILE"]',
+                    "-c",
+                    f"mcp_servers.egor_context.enabled_tools={context_tools!r}",
+                    "-c",
+                    'mcp_servers.egor_context.default_tools_approval_mode="approve"',
+                    "-c",
+                    "mcp_servers.egor_context.required=true",
+                ]
+            )
+
         return create_cli(
             CLIConfig(
                 provider=provider,

@@ -530,6 +530,7 @@ class AgentConfig(BaseModel):
     memory_reflection: MemoryReflectionConfig = Field(default_factory=MemoryReflectionConfig)
     memory_compaction: MemoryCompactionConfig = Field(default_factory=MemoryCompactionConfig)
     memory_scope: str = "agent"
+    shared_context_file: str = ""
     webhooks: WebhookConfig = Field(default_factory=WebhookConfig)
     api: ApiConfig = Field(default_factory=ApiConfig)
     cli_parameters: CLIParametersConfig = Field(default_factory=CLIParametersConfig)
@@ -576,6 +577,14 @@ class AgentConfig(BaseModel):
         if value not in {"agent", "chat"}:
             raise ValueError("memory_scope must be 'agent' or 'chat'")
         return value
+
+    @field_validator("shared_context_file")
+    @classmethod
+    def _validate_shared_context_file(cls, value: str) -> str:
+        normalized = value.strip()
+        if normalized and not Path(normalized).expanduser().is_absolute():
+            raise ValueError("shared_context_file must be an absolute path")
+        return normalized
 
     @model_validator(mode="after")
     def _sync_cli_timeout_to_timeouts(self) -> AgentConfig:

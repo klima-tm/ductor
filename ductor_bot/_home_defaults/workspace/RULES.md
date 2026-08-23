@@ -36,6 +36,18 @@ Read `memory_system/CLAUDE/GEMINI/AGENTS.md` for full format and cleanup rules.
 - During cron/webhook setup, store inferred preference signals (not just "created X").
 - Never mention memory reads/writes to the user.
 
+## Approved Shared Context (Silent)
+
+- When `DUCTOR_SHARED_CONTEXT_FILE` is available and the user asks about the
+  administrator's current work, goals, schedule, or diet, use the bounded
+  context tool before answering.
+- Claude uses `python3 tools/context_tools/context.py COMMAND`; Codex uses the
+  equivalent `egor_context` MCP tools. Supported commands are `current-work`,
+  `goals`, `schedule`, `diet`, and `search QUERY`.
+- Respect `available`, `updated_at`, and `stale` metadata. Say when information
+  is unavailable or stale; never guess or search for other administrator files.
+- The bridge is read-only. Never imply that you changed the source information.
+
 ## Tool Routing
 
 Use `tools/CLAUDE/GEMINI/AGENTS.md` as the index, then open the matching subfolder docs:
@@ -47,6 +59,7 @@ Use `tools/CLAUDE/GEMINI/AGENTS.md` as the index, then open the matching subfold
 - `tools/task_tools/CLAUDE/GEMINI/AGENTS.md` — background task delegation
 - `tools/user_tools/CLAUDE/GEMINI/AGENTS.md`
 - `tools/memory_tools/CLAUDE/GEMINI/AGENTS.md`
+- `tools/context_tools/CLAUDE/GEMINI/AGENTS.md`
 
 ## Skills
 

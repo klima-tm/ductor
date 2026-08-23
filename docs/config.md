@@ -102,6 +102,7 @@ Changes take effect on the next CLI invocation (mtime-based cache invalidation, 
 | `memory_reflection` | `MemoryReflectionConfig` | see below | Optional periodic memory reflection hook |
 | `memory_compaction` | `MemoryCompactionConfig` | see below | LLM-driven `MAINMEMORY.md` compaction policy |
 | `memory_scope` | `str` | `"agent"` | Durable memory boundary: `"agent"` keeps the legacy shared `MAINMEMORY.md`; `"chat"` creates an opaque isolated profile per transport/chat, shared across topics and model providers |
+| `shared_context_file` | `str` | `""` | Optional absolute path to an administrator-curated read-only context snapshot. When set, Claude receives the bounded context command and Codex receives a five-tool stdio MCP server. |
 | `cleanup` | `CleanupConfig` | see below | Daily file-retention cleanup |
 | `webhooks` | `WebhookConfig` | see below | Webhook HTTP server config |
 | `api` | `ApiConfig` | see below | Direct WebSocket API server config |
