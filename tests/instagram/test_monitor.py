@@ -146,6 +146,92 @@ async def test_client_fetches_and_downloads_actual_media(
     await client.close()
 
 
+async def test_fixture_journey_retries_media_batch_then_suppresses_duplicates(
+    aiohttp_server: Any,
+    tmp_path: Path,
+) -> None:
+    """Exercise seed, reel/story media, retry, delivery, and dedup as one journey."""
+    current: dict[str, list[dict[str, Any]]] = {
+        "feed": [{"pk": "old-post", "code": "OLD", "taken_at": 1}],
+        "stories": [],
+    }
+
+    async def user(_request: web.Request) -> web.Response:
+        return web.json_response({"pk": "123"})
+
+    async def feed(_request: web.Request) -> web.Response:
+        return web.json_response([current["feed"], None])
+
+    async def stories(_request: web.Request) -> web.Response:
+        return web.json_response(current["stories"])
+
+    async def image(_request: web.Request) -> web.Response:
+        return web.Response(body=b"fixture-image", content_type="image/jpeg")
+
+    async def video(_request: web.Request) -> web.Response:
+        return web.Response(body=b"fixture-video", content_type="video/mp4")
+
+    app = web.Application()
+    app.router.add_get("/v1/user/by/username", user)
+    app.router.add_get("/v1/user/medias/chunk", feed)
+    app.router.add_get("/v1/user/stories", stories)
+    app.router.add_get("/fixture.jpg", image)
+    app.router.add_get("/fixture.mp4", video)
+    server = await aiohttp_server(app)
+    base_url = str(server.make_url("/"))
+    key = tmp_path / "key"
+    key.write_text("test-key", encoding="utf-8")
+    client = HikerAPIClient(str(key), base_url=base_url)
+    paths = DuctorPaths(ductor_home=tmp_path / "ductor")
+    observer = InstagramObserver(
+        _config(tmp_path),
+        paths,
+        client=client,
+    )
+    wake = AsyncMock(side_effect=[None, "What a mood 😍"])
+    observer.set_wake_handler(wake)
+
+    assert await observer.poll_once() == 0
+    wake.assert_not_awaited()
+
+    current["feed"].append(
+        {
+            "pk": "new-reel",
+            "code": "REEL",
+            "product_type": "clips",
+            "taken_at": 2,
+            "video_url": f"{base_url}fixture.mp4",
+        }
+    )
+    current["stories"].append(
+        {
+            "pk": "new-story",
+            "product_type": "story",
+            "taken_at": 3,
+            "image_versions": [{"url": f"{base_url}fixture.jpg"}],
+        }
+    )
+
+    assert await observer.poll_once() == 0
+    assert await observer.poll_once() == 1
+    assert await observer.poll_once() == 0
+    assert wake.await_count == 2
+
+    retry_prompt = wake.await_args_list[0].args[1]
+    delivered_prompt = wake.await_args_list[1].args[1]
+    for prompt in (retry_prompt, delivered_prompt):
+        assert "ITEM 1 — reel" in prompt
+        assert "ITEM 2 — story" in prompt
+        assert ".mp4" in prompt
+        assert ".jpg" in prompt
+
+    state = load_json(paths.instagram_monitor_state_path)
+    assert state is not None
+    assert "reel:new-reel" in state["seen"]
+    assert "story:new-story" in state["seen"]
+    await client.close()
+
+
 async def test_client_rejects_unexpected_media_host(tmp_path: Path) -> None:
     key = tmp_path / "key"
     key.write_text("test-key", encoding="utf-8")
@@ -191,6 +277,7 @@ async def test_new_item_wakes_once_with_real_media_path(tmp_path: Path) -> None:
     assert await observer.poll_once() == 1
     assert await observer.poll_once() == 0
     wake.assert_awaited_once()
+    assert wake.await_args is not None
     prompt = wake.await_args.args[1]
     assert "ITEM 1 — reel" in prompt
     assert str(media) in prompt
@@ -219,6 +306,7 @@ async def test_multiple_new_items_are_evaluated_in_one_turn(tmp_path: Path) -> N
 
     assert await observer.poll_once() == 1
     wake.assert_awaited_once()
+    assert wake.await_args is not None
     prompt = wake.await_args.args[1]
     assert "ITEM 1 — story" in prompt
     assert "ITEM 2 — reel" in prompt
