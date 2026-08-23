@@ -102,6 +102,8 @@ async def test_client_fetches_and_downloads_actual_media(
     tmp_path: Path,
 ) -> None:
     async def user(_request: web.Request) -> web.Response:
+        assert _request.headers["User-Agent"].startswith("SisterAgent/")
+        assert _request.headers["x-access-key"] == "test-key"
         return web.json_response({"pk": "123"})
 
     async def feed(request: web.Request) -> web.Response:
@@ -117,9 +119,11 @@ async def test_client_fetches_and_downloads_actual_media(
         )
 
     async def image(_request: web.Request) -> web.Response:
+        assert _request.headers["User-Agent"].startswith("SisterAgent/")
         return web.Response(body=b"jpeg", content_type="image/jpeg")
 
     async def video(_request: web.Request) -> web.Response:
+        assert _request.headers["User-Agent"].startswith("SisterAgent/")
         return web.Response(body=b"mp4", content_type="video/mp4")
 
     app = web.Application()
