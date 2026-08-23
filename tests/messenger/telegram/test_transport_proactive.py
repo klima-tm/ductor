@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 from ductor_bot.bus.adapters import from_webhook_wake
+from ductor_bot.instagram import NO_REACTION_TOKEN
 from ductor_bot.messenger.telegram.transport import TelegramTransport
 
 if TYPE_CHECKING:
@@ -35,6 +36,20 @@ async def test_proactive_text_mode_sends_text(monkeypatch: pytest.MonkeyPatch) -
 
     send_rich.assert_awaited_once()
     bot._speech.synthesize.assert_not_awaited()
+
+
+async def test_no_reaction_token_sends_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    transport, bot = _transport("voice")
+    send_rich = AsyncMock()
+    monkeypatch.setattr("ductor_bot.messenger.telegram.transport.send_rich", send_rich)
+    env = from_webhook_wake(123, NO_REACTION_TOKEN)
+    env.result_text = NO_REACTION_TOKEN
+
+    await transport.deliver(env)
+
+    send_rich.assert_not_awaited()
+    bot._speech.synthesize.assert_not_awaited()
+    bot.bot_instance.send_voice.assert_not_awaited()
 
 
 async def test_proactive_voice_mode_sends_native_voice(
