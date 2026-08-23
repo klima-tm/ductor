@@ -21,6 +21,7 @@ _CONTENT_EXTENSIONS = {
     "video/mp4": ".mp4",
     "video/quicktime": ".mov",
 }
+_CLIENT_USER_AGENT = "SisterAgent/1.0 (+https://github.com/klima-tm/sister-agent)"
 
 
 class HikerAPIError(RuntimeError):
@@ -117,7 +118,11 @@ class HikerAPIClient:
         try:
             async with session.get(
                 f"{self._base_url}{path}",
-                headers={"x-access-key": key},
+                headers={
+                    "Accept": "application/json",
+                    "User-Agent": _CLIENT_USER_AGENT,
+                    "x-access-key": key,
+                },
                 params=params,
                 timeout=self._timeout,
             ) as response:
@@ -133,7 +138,11 @@ class HikerAPIClient:
         session = self._get_session()
         temporary = stem.with_suffix(".part")
         try:
-            async with session.get(url, timeout=self._timeout) as response:
+            async with session.get(
+                url,
+                headers={"User-Agent": _CLIENT_USER_AGENT},
+                timeout=self._timeout,
+            ) as response:
                 _require_status(response.status, "Instagram media download")
                 _validate_media_url(str(response.url), self._base_url)
                 content_type = response.headers.get("Content-Type", "").split(";", 1)[0].lower()
