@@ -36,6 +36,11 @@ _TOOLS = [
             "properties": {
                 "start_date": {"type": "string", "format": "date"},
                 "end_date": {"type": "string", "format": "date"},
+                "at_time": {
+                    "type": "string",
+                    "description": "Optional clock time in the schedule display timezone (HH:MM).",
+                    "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
+                },
                 "include_routines": {"type": "boolean", "default": True},
                 "routine_query": {"type": "string", "maxLength": 200},
             },
@@ -97,11 +102,13 @@ def handle_request(message: dict[str, Any]) -> dict[str, object] | None:
     elif name == "get_schedule":
         start_date = arguments.get("start_date")
         end_date = arguments.get("end_date")
+        at_time = arguments.get("at_time")
         include_routines = arguments.get("include_routines", True)
         routine_query = arguments.get("routine_query")
         if (
             (start_date is not None and not isinstance(start_date, str))
             or (end_date is not None and not isinstance(end_date, str))
+            or (at_time is not None and not isinstance(at_time, str))
             or not isinstance(include_routines, bool)
             or (routine_query is not None and not isinstance(routine_query, str))
         ):
@@ -109,6 +116,7 @@ def handle_request(message: dict[str, Any]) -> dict[str, object] | None:
         payload = get_schedule(
             start_date,
             end_date,
+            at_time=at_time,
             include_routines=include_routines,
             routine_query=routine_query,
         )

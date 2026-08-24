@@ -76,7 +76,13 @@ def snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
                                     "summary": "Lesson",
                                     "start": {"dateTime": "2026-08-27T17:30:00+07:00"},
                                     "end": {"dateTime": "2026-08-27T18:30:00+07:00"},
-                                }
+                                },
+                                {
+                                    "id": "event-offset",
+                                    "summary": "Imported lesson",
+                                    "start": {"dateTime": "2026-08-27T10:30:00Z"},
+                                    "end": {"dateTime": "2026-08-27T11:30:00Z"},
+                                },
                             ],
                             "routines": [
                                 {
@@ -120,6 +126,7 @@ def test_category_reports_source_freshness_and_unavailable_state(
     assert schedule["success"] is True
     assert schedule["available"] is True
     assert schedule["calendar_events"][0]["summary"] == "Lesson"
+    assert schedule["calendar_events"][0]["display_start"] == "2026-08-27T17:30:00+07:00"
     assert schedule["routines"][0]["Name"] == "English"
     assert schedule["calendar_authoritative_for_specific_dates"] is True
 
@@ -132,6 +139,76 @@ def test_schedule_query_is_bounded_and_filters_by_date(context_dir: Path, snapsh
     assert empty["routines"] == []
     invalid = shared.get_schedule("2026-08-27", "2026-10-01")
     assert invalid == {"success": False, "error": "schedule queries are limited to 32 days"}
+
+
+def test_schedule_clock_query_normalizes_offsets_and_returns_all_overlaps(
+    context_dir: Path, snapshot: Path
+) -> None:
+    del snapshot
+    shared = _module("test_context_clock_schedule", context_dir / "_shared.py")
+    result = shared.get_schedule(
+        "2026-08-27", "2026-08-27", at_time="17:30", include_routines=False
+    )
+    assert [event["summary"] for event in result["calendar_events"]] == [
+        "Lesson",
+        "Imported lesson",
+    ]
+    assert result["calendar_events"][1]["display_start"] == "2026-08-27T17:30:00+07:00"
+    assert result["requested_time"] == "17:30"
+    assert result["all_simultaneous_calendar_events_are_returned"] is True
+    assert shared.get_schedule("2026-08-27", "2026-08-28", at_time="17:30") == {
+        "success": False,
+        "error": "at_time requires one date (start_date and end_date must match)",
+    }
+    assert shared.get_schedule("2026-08-27", "2026-08-27", at_time="5pm") == {
+        "success": False,
+        "error": "at_time must use HH:MM",
+    }
+
+
+def test_schedule_regression_for_kaliningrad_five_pm(context_dir: Path, snapshot: Path) -> None:
+    payload = json.loads(snapshot.read_text(encoding="utf-8"))
+    schedule = payload["categories"]["schedule"]["data"]
+    schedule["timezone"] = "Europe/Kaliningrad"
+    schedule["calendar_events"] = [
+        {
+            "summary": "Build block",
+            "start": {"dateTime": "2026-08-25T21:15:00+07:00"},
+            "end": {"dateTime": "2026-08-25T22:15:00+07:00"},
+        },
+        {
+            "summary": "italki Lesson: english - Emmanuel",
+            "start": {"dateTime": "2026-08-25T15:00:00Z"},
+            "end": {"dateTime": "2026-08-25T16:00:00Z"},
+        },
+        {
+            "summary": "Post something",
+            "start": {"dateTime": "2026-08-25T22:00:00+07:00"},
+            "end": {"dateTime": "2026-08-25T22:30:00+07:00"},
+        },
+        {
+            "summary": "Bangkok five pm macro",
+            "start": {"dateTime": "2026-08-25T13:00:00+07:00"},
+            "end": {"dateTime": "2026-08-25T19:50:00+07:00"},
+        },
+    ]
+    snapshot.write_text(json.dumps(payload), encoding="utf-8")
+    shared = _module("test_context_kaliningrad_schedule", context_dir / "_shared.py")
+
+    result = shared.get_schedule(
+        "2026-08-25", "2026-08-25", at_time="17:00", include_routines=False
+    )
+
+    assert [event["summary"] for event in result["calendar_events"]] == [
+        "Build block",
+        "italki Lesson: english - Emmanuel",
+        "Post something",
+    ]
+    assert {event["display_start"] for event in result["calendar_events"]} == {
+        "2026-08-25T16:15:00+02:00",
+        "2026-08-25T17:00:00+02:00",
+    }
+    assert result["timezone"] == "Europe/Kaliningrad"
 
 
 def test_search_is_bounded_to_approved_categories(context_dir: Path, snapshot: Path) -> None:
@@ -162,6 +239,7 @@ def test_mcp_lists_only_five_read_tools(context_dir: Path, snapshot: Path) -> No
         tool for tool in listed["result"]["tools"] if tool["name"] == "get_schedule"
     )
     assert "start_date" in schedule_tool["inputSchema"]["properties"]
+    assert "at_time" in schedule_tool["inputSchema"]["properties"]
     denied = mcp.handle_request(
         {
             "jsonrpc": "2.0",
