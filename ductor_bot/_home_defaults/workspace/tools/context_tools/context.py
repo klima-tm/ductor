@@ -21,6 +21,7 @@ def main() -> None:
     parser.add_argument("query", nargs="*")
     parser.add_argument("--start")
     parser.add_argument("--end")
+    parser.add_argument("--at")
     parser.add_argument("--no-routines", action="store_true")
     parser.add_argument("--routine-query")
     args = parser.parse_args()
@@ -30,6 +31,7 @@ def main() -> None:
         result = get_schedule(
             args.start,
             args.end,
+            at_time=args.at,
             include_routines=not args.no_routines,
             routine_query=args.routine_query,
         )

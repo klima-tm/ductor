@@ -107,6 +107,7 @@ def get_schedule(
     start_date: str | None = None,
     end_date: str | None = None,
     *,
+    at_time: str | None = None,
     include_routines: bool = True,
     routine_query: str | None = None,
 ) -> dict[str, Any]:
@@ -148,6 +149,21 @@ def get_schedule(
     if (end - start).days > 31:
         return {"success": False, "error": "schedule queries are limited to 32 days"}
 
+    requested_at: datetime | None = None
+    if at_time is not None:
+        if start != end:
+            return {
+                "success": False,
+                "error": "at_time requires one date (start_date and end_date must match)",
+            }
+        try:
+            parsed_clock = time.fromisoformat(at_time)
+        except ValueError:
+            return {"success": False, "error": "at_time must use HH:MM"}
+        if parsed_clock.second or parsed_clock.microsecond or len(at_time) != 5:
+            return {"success": False, "error": "at_time must use HH:MM"}
+        requested_at = datetime.combine(start, parsed_clock, local_zone)
+
     range_start = datetime.combine(start, time.min, local_zone)
     range_end = datetime.combine(end + timedelta(days=1), time.min, local_zone)
     events: list[dict[str, Any]] = []
@@ -158,8 +174,17 @@ def get_schedule(
                 continue
             event_start = _event_time(event.get("start"), local_zone=local_zone, default=range_end)
             event_end = _event_time(event.get("end"), local_zone=local_zone, default=event_start)
-            if event_start < range_end and event_end > range_start:
-                events.append(event)
+            if requested_at is not None:
+                included = event_start <= requested_at < event_end
+            else:
+                included = event_start < range_end and event_end > range_start
+            if included:
+                normalized_event = dict(event)
+                normalized_event["display_start"] = event_start.isoformat()
+                normalized_event["display_end"] = event_end.isoformat()
+                normalized_event["display_timezone"] = timezone_name
+                events.append(normalized_event)
+    events.sort(key=lambda event: str(event.get("display_start") or ""))
 
     routines: list[dict[str, Any]] = []
     normalized_query = " ".join((routine_query or "").split())[:200].casefold()
@@ -189,7 +214,11 @@ def get_schedule(
         "routines": routines,
         "calendar_authoritative_for_specific_dates": True,
         "routine_times_are_reference_only": True,
+        "all_simultaneous_calendar_events_are_returned": True,
+        "use_display_start_and_display_end_for_clock_times": True,
     }
+    if requested_at is not None:
+        result["requested_time"] = at_time
     coverage = data.get("calendar_coverage")
     if isinstance(coverage, dict):
         result["calendar_coverage"] = coverage

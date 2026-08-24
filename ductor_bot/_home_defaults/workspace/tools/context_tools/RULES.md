@@ -8,6 +8,7 @@ Claude commands:
 - `python3 tools/context_tools/context.py current-work`
 - `python3 tools/context_tools/context.py goals`
 - `python3 tools/context_tools/context.py schedule --start YYYY-MM-DD --end YYYY-MM-DD`
+- For a clock-time question: `python3 tools/context_tools/context.py schedule --start YYYY-MM-DD --end YYYY-MM-DD --at HH:MM`
 - `python3 tools/context_tools/context.py diet`
 - `python3 tools/context_tools/context.py search QUERY`
 
@@ -20,3 +21,9 @@ information honestly. Do not inspect other files or infer denied categories.
 For a specific date, trust Calendar events over a routine's `Default time`.
 Routine times and windows describe the normal structure only. The schedule tool
 already removes restricted routine rows; never speculate about omitted data.
+
+Interpret clock times only through `display_start` and `display_end` in the
+returned schedule timezone. When the user asks what happens at a specific time,
+pass that time to the schedule tool. Calendar overlaps are intentional: report
+every returned simultaneous event, foregrounding a specific booked appointment
+or class over a broad routine block without hiding the conflicting blocks.
