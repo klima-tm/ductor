@@ -59,11 +59,34 @@ def snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
                         "content": "- Move to a warm country\n- Improve English",
                     },
                     "schedule": {
-                        "available": False,
-                        "source": None,
-                        "updated_at": None,
-                        "stale_after_seconds": 0,
-                        "message": "No approved schedule source is connected yet.",
+                        "available": True,
+                        "source": "approved_calendar_and_routines",
+                        "updated_at": "2026-08-23T00:00:00Z",
+                        "stale_after_seconds": 999999999,
+                        "content": "Lesson 17:30; English Window: 18:00-22:30",
+                        "data": {
+                            "timezone": "Asia/Bangkok",
+                            "calendar_coverage": {
+                                "start": "2026-08-23",
+                                "end": "2026-09-30",
+                            },
+                            "calendar_events": [
+                                {
+                                    "id": "event-1",
+                                    "summary": "Lesson",
+                                    "start": {"dateTime": "2026-08-27T17:30:00+07:00"},
+                                    "end": {"dateTime": "2026-08-27T18:30:00+07:00"},
+                                }
+                            ],
+                            "routines": [
+                                {
+                                    "Name": "English",
+                                    "Default time": "Window: 18:00-22:30",
+                                    "Status": "Set",
+                                    "View": "Daily",
+                                }
+                            ],
+                        },
                     },
                     "diet": {
                         "available": False,
@@ -93,10 +116,22 @@ def test_category_reports_source_freshness_and_unavailable_state(
     assert goals["stale"] is True
     assert "warning" in goals
 
-    schedule = shared.get_category("schedule")
+    schedule = shared.get_schedule("2026-08-27", "2026-08-27")
     assert schedule["success"] is True
-    assert schedule["available"] is False
-    assert "No approved schedule" in schedule["message"]
+    assert schedule["available"] is True
+    assert schedule["calendar_events"][0]["summary"] == "Lesson"
+    assert schedule["routines"][0]["Name"] == "English"
+    assert schedule["calendar_authoritative_for_specific_dates"] is True
+
+
+def test_schedule_query_is_bounded_and_filters_by_date(context_dir: Path, snapshot: Path) -> None:
+    del snapshot
+    shared = _module("test_context_schedule", context_dir / "_shared.py")
+    empty = shared.get_schedule("2026-08-28", "2026-08-28", include_routines=False)
+    assert empty["calendar_events"] == []
+    assert empty["routines"] == []
+    invalid = shared.get_schedule("2026-08-27", "2026-10-01")
+    assert invalid == {"success": False, "error": "schedule queries are limited to 32 days"}
 
 
 def test_search_is_bounded_to_approved_categories(context_dir: Path, snapshot: Path) -> None:
@@ -123,6 +158,10 @@ def test_mcp_lists_only_five_read_tools(context_dir: Path, snapshot: Path) -> No
         "get_diet",
         "search_shared_context",
     }
+    schedule_tool = next(
+        tool for tool in listed["result"]["tools"] if tool["name"] == "get_schedule"
+    )
+    assert "start_date" in schedule_tool["inputSchema"]["properties"]
     denied = mcp.handle_request(
         {
             "jsonrpc": "2.0",

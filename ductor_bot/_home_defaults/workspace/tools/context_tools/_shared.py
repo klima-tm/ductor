@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 _ENV = "DUCTOR_SHARED_CONTEXT_FILE"
 _MAX_FILE_BYTES = 1024 * 1024
@@ -73,6 +74,133 @@ def get_category(category: str) -> dict[str, Any]:
             result["warning"] = "This snapshot may be stale; state that caveat instead of guessing."
     else:
         result["message"] = str(entry.get("message") or "Information is unavailable.")
+    return result
+
+
+def _date(value: str | None, *, fallback: date) -> date:
+    if value is None:
+        return fallback
+    try:
+        return date.fromisoformat(value)
+    except ValueError as error:
+        raise ValueError("dates must use YYYY-MM-DD") from error
+
+
+def _event_time(value: object, *, local_zone: ZoneInfo, default: datetime) -> datetime:
+    if not isinstance(value, dict):
+        return default
+    date_time = value.get("dateTime")
+    if isinstance(date_time, str):
+        parsed = _parse_time(date_time)
+        if parsed is not None:
+            return parsed.astimezone(local_zone)
+    day = value.get("date")
+    if isinstance(day, str):
+        try:
+            return datetime.combine(date.fromisoformat(day), time.min, local_zone)
+        except ValueError:
+            pass
+    return default
+
+
+def get_schedule(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    *,
+    include_routines: bool = True,
+    routine_query: str | None = None,
+) -> dict[str, Any]:
+    """Return a bounded date slice plus the approved reference routines."""
+
+    snapshot, error = _load()
+    if snapshot is None:
+        return {"success": False, "error": error}
+    entry = snapshot["categories"].get("schedule")
+    if not isinstance(entry, dict):
+        return {"success": False, "error": "approved schedule category is missing"}
+    if entry.get("available") is not True:
+        return {
+            "success": True,
+            "category": "schedule",
+            "available": False,
+            "source": entry.get("source"),
+            "updated_at": entry.get("updated_at"),
+            "stale": False,
+            "message": str(entry.get("message") or "Schedule information is unavailable."),
+        }
+    data = entry.get("data")
+    if not isinstance(data, dict):
+        return {"success": False, "error": "approved schedule data is malformed"}
+
+    timezone_name = str(data.get("timezone") or "UTC")
+    try:
+        local_zone = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        return {"success": False, "error": "approved schedule timezone is invalid"}
+    today = datetime.now(local_zone).date()
+    try:
+        start = _date(start_date, fallback=today)
+        end = _date(end_date, fallback=start)
+    except ValueError as parse_error:
+        return {"success": False, "error": str(parse_error)}
+    if end < start:
+        return {"success": False, "error": "end_date must not be before start_date"}
+    if (end - start).days > 31:
+        return {"success": False, "error": "schedule queries are limited to 32 days"}
+
+    range_start = datetime.combine(start, time.min, local_zone)
+    range_end = datetime.combine(end + timedelta(days=1), time.min, local_zone)
+    events: list[dict[str, Any]] = []
+    raw_events = data.get("calendar_events")
+    if isinstance(raw_events, list):
+        for event in raw_events:
+            if not isinstance(event, dict):
+                continue
+            event_start = _event_time(event.get("start"), local_zone=local_zone, default=range_end)
+            event_end = _event_time(event.get("end"), local_zone=local_zone, default=event_start)
+            if event_start < range_end and event_end > range_start:
+                events.append(event)
+
+    routines: list[dict[str, Any]] = []
+    normalized_query = " ".join((routine_query or "").split())[:200].casefold()
+    if include_routines:
+        raw_routines = data.get("routines")
+        if isinstance(raw_routines, list):
+            for routine in raw_routines:
+                if not isinstance(routine, dict):
+                    continue
+                if (
+                    normalized_query
+                    and normalized_query not in json.dumps(routine, ensure_ascii=False).casefold()
+                ):
+                    continue
+                routines.append(routine)
+
+    result: dict[str, Any] = {
+        "success": True,
+        "category": "schedule",
+        "available": True,
+        "source": entry.get("source"),
+        "updated_at": entry.get("updated_at"),
+        "stale": _stale(entry),
+        "timezone": timezone_name,
+        "date_range": {"start": start.isoformat(), "end": end.isoformat()},
+        "calendar_events": events,
+        "routines": routines,
+        "calendar_authoritative_for_specific_dates": True,
+        "routine_times_are_reference_only": True,
+    }
+    coverage = data.get("calendar_coverage")
+    if isinstance(coverage, dict):
+        result["calendar_coverage"] = coverage
+        coverage_start = coverage.get("start")
+        coverage_end = coverage.get("end")
+        if isinstance(coverage_start, str) and isinstance(coverage_end, str):
+            result["coverage_complete"] = (
+                coverage_start <= start.isoformat() and end.isoformat() <= coverage_end
+            )
+    if result["stale"]:
+        result["warning"] = "This snapshot may be stale; state that caveat instead of guessing."
     return result
 
 
