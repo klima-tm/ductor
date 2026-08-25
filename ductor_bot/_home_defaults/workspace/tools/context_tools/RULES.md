@@ -35,19 +35,13 @@ dialogue. Rewrite obvious imported labels or explanatory suffixes naturally
 without changing the fact: for example, render a teacher stored as
 `Jerel with a J` simply as `Jerel`. Do not simplify uncertain wording.
 
-Use event specificity, recurrence, origin, timing, and known habits to infer the
-likely resolution. Egor usually reconciles that day's conflicts during the
-morning. Other recurring blocks normally happen at their default times, but he
-reflows them when a booked lesson lands elsewhere. `Lesson` is the movable
-default slot for a real lesson; a concrete italki booking normally represents
-that day's actual lesson rather than an additional lesson merely because the
-template remains on the calendar. An overlap makes that override especially
-clear, but use the whole context rather than one rigid matching rule.
-
-`Post something` is a real recurring Tuesday/Thursday task with a default time,
-not an occasional event, but it is flexible. When it conflicts with a fixed
-appointment, it will probably be moved earlier or later during that morning's
-reconciliation. Apply the broader principle to similar events instead of
-hard-coding an answer around these titles. Explain the probable real sequence,
-not just the existence of conflicts, and keep all such resolutions as natural
-low-stakes inferences rather than guarantees.
+Use current event specificity, recurrence, origin, timing, approved Routines
+metadata, and known habits to infer the likely resolution. Egor usually
+reconciles that day's conflicts during the morning, so future overlaps may still
+move. A concrete booked or imported event is normally stronger evidence than an
+overlapping background routine template, while a scheduled but flexible task
+may move around a fixed commitment. Reconstruct the probable real sequence and
+meaningful gaps from the current data rather than encoding named event titles or
+recurrence patterns as response rules. Do not surface recurrence, classification,
+or other internal metadata unless it actually helps answer the user's question.
+Keep the resolution as a natural low-stakes inference rather than a guarantee.
