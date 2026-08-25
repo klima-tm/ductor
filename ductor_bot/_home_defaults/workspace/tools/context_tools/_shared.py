@@ -189,13 +189,42 @@ def _attach_same_activity_groups(events: list[dict[str, Any]]) -> None:
         if len(unique_indexes) < 2:
             continue
         routine_name, block_name = labels[key]
+        concrete_indexes = [
+            index
+            for index in unique_indexes
+            if events[index]["schedule_evidence"].get("is_recurring_calendar_event") is False
+            and events[index]["schedule_evidence"].get("calendar_source") == "non_primary"
+        ]
+        template_indexes = [
+            index
+            for index in unique_indexes
+            if events[index]["schedule_evidence"].get("is_recurring_calendar_event") is True
+            and events[index]["schedule_evidence"].get("calendar_source") == "primary"
+        ]
+        likely_alternatives = bool(concrete_indexes and template_indexes)
         for index in unique_indexes:
             evidence = events[index]["schedule_evidence"]
+            if likely_alternatives:
+                roles = evidence.setdefault("likely_schedule_roles", [])
+                roles.append(
+                    {
+                        "routine": routine_name,
+                        "schedule_block": block_name,
+                        "role": (
+                            "concrete_instance"
+                            if index in concrete_indexes
+                            else "recurring_template_replaced_by_concrete_instance"
+                            if index in template_indexes
+                            else "related_instance"
+                        ),
+                    }
+                )
             same_activity = evidence.setdefault("same_activity_groups", [])
             same_activity.append(
                 {
                     "routine": routine_name,
                     "schedule_block": block_name,
+                    "likely_alternative_instances": likely_alternatives,
                     "other_events": [
                         {
                             "summary": events[other].get("summary"),

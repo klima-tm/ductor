@@ -56,7 +56,9 @@ When `same_activity_groups` links multiple events to the same Routine schedule
 block, treat them as possible alternative instances of one activity rather than
 automatically adding them together. A one-off non-primary event is stronger
 evidence of the concrete instance than a recurring primary-calendar template;
-infer the likely override unless the surrounding data supports genuinely
+when `likely_schedule_roles` marks that relationship, resolve it before the
+first reply and exclude the replaced template as an independent commitment by
+default. Only count both when surrounding data clearly supports genuinely
 separate occurrences.
 
 Answer the user's real social decision, not the calendar database. Lead with the
