@@ -103,6 +103,59 @@ def _event_time(value: object, *, local_zone: ZoneInfo, default: datetime) -> da
     return default
 
 
+def _string_list(value: object) -> list[str]:
+    candidate = value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            parsed = None
+        candidate = parsed if isinstance(parsed, list) else [value]
+    if not isinstance(candidate, list):
+        return []
+    return [str(item).strip() for item in candidate if str(item).strip()]
+
+
+def _routine_evidence(routine: dict[str, Any]) -> dict[str, Any] | None:
+    properties = routine.get("properties")
+    if not isinstance(properties, dict):
+        properties = routine
+    name = str(properties.get("Name") or "").strip()
+    if not name:
+        return None
+    evidence: dict[str, Any] = {
+        "name": name,
+        "schedule_blocks": _string_list(properties.get("Schedule block")),
+        "activation": _string_list(properties.get("Activation")),
+    }
+    for source, target in (
+        ("Default time", "default_time"),
+        ("Duration", "duration"),
+        ("Status", "status"),
+        ("View", "view"),
+    ):
+        value = properties.get(source)
+        if value not in (None, ""):
+            evidence[target] = value
+    return evidence
+
+
+def _matching_routines(summary: str, routines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    normalized_summary = " ".join(summary.casefold().split())
+    matches: list[dict[str, Any]] = []
+    for routine in routines:
+        blocks = routine.get("schedule_blocks")
+        if not isinstance(blocks, list):
+            continue
+        if any(
+            " ".join(str(block).casefold().split()) in normalized_summary
+            for block in blocks
+            if str(block).strip()
+        ):
+            matches.append(routine)
+    return matches
+
+
 def get_schedule(
     start_date: str | None = None,
     end_date: str | None = None,
@@ -166,6 +219,17 @@ def get_schedule(
 
     range_start = datetime.combine(start, time.min, local_zone)
     range_end = datetime.combine(end + timedelta(days=1), time.min, local_zone)
+    raw_routines = data.get("routines")
+    routine_records = (
+        [routine for routine in raw_routines if isinstance(routine, dict)]
+        if isinstance(raw_routines, list)
+        else []
+    )
+    routine_evidence = [
+        evidence
+        for routine in routine_records
+        if (evidence := _routine_evidence(routine)) is not None
+    ]
     events: list[dict[str, Any]] = []
     raw_events = data.get("calendar_events")
     if isinstance(raw_events, list):
@@ -183,23 +247,34 @@ def get_schedule(
                 normalized_event["display_start"] = event_start.isoformat()
                 normalized_event["display_end"] = event_end.isoformat()
                 normalized_event["display_timezone"] = timezone_name
+                calendar = event.get("calendar")
+                primary = calendar.get("primary") if isinstance(calendar, dict) else None
+                normalized_event["schedule_evidence"] = {
+                    "is_recurring_calendar_event": isinstance(event.get("recurringEventId"), str),
+                    "calendar_source": (
+                        "primary"
+                        if primary is True
+                        else "non_primary"
+                        if primary is False
+                        else "unknown"
+                    ),
+                    "matching_routines": _matching_routines(
+                        str(event.get("summary") or ""), routine_evidence
+                    ),
+                }
                 events.append(normalized_event)
     events.sort(key=lambda event: str(event.get("display_start") or ""))
 
     routines: list[dict[str, Any]] = []
     normalized_query = " ".join((routine_query or "").split())[:200].casefold()
     if include_routines:
-        raw_routines = data.get("routines")
-        if isinstance(raw_routines, list):
-            for routine in raw_routines:
-                if not isinstance(routine, dict):
-                    continue
-                if (
-                    normalized_query
-                    and normalized_query not in json.dumps(routine, ensure_ascii=False).casefold()
-                ):
-                    continue
-                routines.append(routine)
+        for routine in routine_records:
+            if (
+                normalized_query
+                and normalized_query not in json.dumps(routine, ensure_ascii=False).casefold()
+            ):
+                continue
+            routines.append(routine)
 
     result: dict[str, Any] = {
         "success": True,

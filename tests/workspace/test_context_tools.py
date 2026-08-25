@@ -74,12 +74,15 @@ def snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
                                 {
                                     "id": "event-1",
                                     "summary": "Lesson",
+                                    "recurringEventId": "lesson-template",
+                                    "calendar": {"primary": True},
                                     "start": {"dateTime": "2026-08-27T17:30:00+07:00"},
                                     "end": {"dateTime": "2026-08-27T18:30:00+07:00"},
                                 },
                                 {
                                     "id": "event-offset",
                                     "summary": "Imported lesson",
+                                    "calendar": {"primary": False},
                                     "start": {"dateTime": "2026-08-27T10:30:00Z"},
                                     "end": {"dateTime": "2026-08-27T11:30:00Z"},
                                 },
@@ -88,6 +91,8 @@ def snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
                                 {
                                     "Name": "English",
                                     "Default time": "Window: 18:00-22:30",
+                                    "Schedule block": '["Lesson"]',
+                                    "Activation": '["Daily"]',
                                     "Status": "Set",
                                     "View": "Daily",
                                 }
@@ -127,6 +132,19 @@ def test_category_reports_source_freshness_and_unavailable_state(
     assert schedule["available"] is True
     assert schedule["calendar_events"][0]["summary"] == "Lesson"
     assert schedule["calendar_events"][0]["display_start"] == "2026-08-27T17:30:00+07:00"
+    evidence = schedule["calendar_events"][0]["schedule_evidence"]
+    assert evidence["is_recurring_calendar_event"] is True
+    assert evidence["calendar_source"] == "primary"
+    assert evidence["matching_routines"] == [
+        {
+            "name": "English",
+            "schedule_blocks": ["Lesson"],
+            "activation": ["Daily"],
+            "default_time": "Window: 18:00-22:30",
+            "status": "Set",
+            "view": "Daily",
+        }
+    ]
     assert schedule["routines"][0]["Name"] == "English"
     assert schedule["calendar_authoritative_for_specific_dates"] is True
 
@@ -156,6 +174,10 @@ def test_schedule_clock_query_normalizes_offsets_and_returns_all_overlaps(
     assert result["calendar_events"][1]["display_start"] == "2026-08-27T17:30:00+07:00"
     assert result["requested_time"] == "17:30"
     assert result["all_simultaneous_calendar_events_are_returned"] is True
+    imported_evidence = result["calendar_events"][1]["schedule_evidence"]
+    assert imported_evidence["is_recurring_calendar_event"] is False
+    assert imported_evidence["calendar_source"] == "non_primary"
+    assert imported_evidence["matching_routines"][0]["name"] == "English"
     assert shared.get_schedule("2026-08-27", "2026-08-28", at_time="17:30") == {
         "success": False,
         "error": "at_time requires one date (start_date and end_date must match)",
