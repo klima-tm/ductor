@@ -266,6 +266,58 @@ def test_schedule_regression_for_kaliningrad_five_pm(context_dir: Path, snapshot
     assert result["timezone"] == "Europe/Kaliningrad"
 
 
+def test_schedule_marks_overlapped_recurring_events_for_reflow(
+    context_dir: Path, snapshot: Path
+) -> None:
+    payload = json.loads(snapshot.read_text(encoding="utf-8"))
+    schedule = payload["categories"]["schedule"]["data"]
+    schedule["calendar_events"].append(
+        {
+            "summary": "News",
+            "recurringEventId": "news-template",
+            "calendar": {"primary": True},
+            "start": {"dateTime": "2026-08-27T17:45:00+07:00"},
+            "end": {"dateTime": "2026-08-27T18:15:00+07:00"},
+        }
+    )
+    schedule["routines"].append(
+        {
+            "Name": "News",
+            "Schedule block": '["News"]',
+            "Activation": '["Daily"]',
+            "Status": "Set",
+            "View": "Daily",
+        }
+    )
+    snapshot.write_text(json.dumps(payload), encoding="utf-8")
+    shared = _module("test_context_reflow_schedule", context_dir / "_shared.py")
+
+    result = shared.get_schedule("2026-08-27", "2026-08-27")
+
+    assert result["schedule_reflow"] == {
+        "unresolved": True,
+        "groups": [
+            {
+                "concrete_event": {
+                    "summary": "Imported lesson",
+                    "display_start": "2026-08-27T17:30:00+07:00",
+                    "display_end": "2026-08-27T18:30:00+07:00",
+                },
+                "displaced_recurring_candidates": [
+                    {
+                        "summary": "News",
+                        "display_start": "2026-08-27T17:45:00+07:00",
+                        "display_end": "2026-08-27T18:15:00+07:00",
+                        "matching_routines": ["News"],
+                    }
+                ],
+                "later_gaps_are_provisional": True,
+            }
+        ],
+        "later_gaps_are_provisional": True,
+    }
+
+
 def test_search_is_bounded_to_approved_categories(context_dir: Path, snapshot: Path) -> None:
     del snapshot
     shared = _module("test_context_search", context_dir / "_shared.py")

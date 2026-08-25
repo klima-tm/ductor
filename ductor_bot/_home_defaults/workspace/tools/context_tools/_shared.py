@@ -256,6 +256,65 @@ def _is_likely_replaced_template(event: dict[str, Any]) -> bool:
     )
 
 
+def _schedule_reflow_groups(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    for concrete in events:
+        evidence = concrete.get("schedule_evidence")
+        if not isinstance(evidence, dict):
+            continue
+        if evidence.get("is_recurring_calendar_event") is not False:
+            continue
+        if evidence.get("calendar_source") != "non_primary":
+            continue
+        concrete_start = _parse_time(concrete.get("display_start"))
+        concrete_end = _parse_time(concrete.get("display_end"))
+        if concrete_start is None or concrete_end is None:
+            continue
+        displaced: list[dict[str, Any]] = []
+        for candidate in events:
+            if candidate is concrete or _is_likely_replaced_template(candidate):
+                continue
+            candidate_evidence = candidate.get("schedule_evidence")
+            if not isinstance(candidate_evidence, dict):
+                continue
+            if candidate_evidence.get("is_recurring_calendar_event") is not True:
+                continue
+            if candidate_evidence.get("calendar_source") != "primary":
+                continue
+            candidate_start = _parse_time(candidate.get("display_start"))
+            candidate_end = _parse_time(candidate.get("display_end"))
+            if candidate_start is None or candidate_end is None:
+                continue
+            if candidate_start >= concrete_end or candidate_end <= concrete_start:
+                continue
+            routine_names = [
+                str(routine.get("name"))
+                for routine in candidate_evidence.get("matching_routines", [])
+                if isinstance(routine, dict) and routine.get("name")
+            ]
+            displaced.append(
+                {
+                    "summary": candidate.get("summary"),
+                    "display_start": candidate.get("display_start"),
+                    "display_end": candidate.get("display_end"),
+                    "matching_routines": routine_names,
+                }
+            )
+        if displaced:
+            groups.append(
+                {
+                    "concrete_event": {
+                        "summary": concrete.get("summary"),
+                        "display_start": concrete.get("display_start"),
+                        "display_end": concrete.get("display_end"),
+                    },
+                    "displaced_recurring_candidates": displaced,
+                    "later_gaps_are_provisional": True,
+                }
+            )
+    return groups
+
+
 def get_schedule(
     start_date: str | None = None,
     end_date: str | None = None,
@@ -374,6 +433,7 @@ def get_schedule(
                 events.append(normalized_event)
     events.sort(key=lambda event: str(event.get("display_start") or ""))
     _attach_same_activity_groups(events)
+    reflow_groups = _schedule_reflow_groups(events)
     source_event_count = len(events)
     replaced_templates = [event for event in events if _is_likely_replaced_template(event)]
     if not include_replaced_templates:
@@ -416,6 +476,11 @@ def get_schedule(
         "source_calendar_event_count": source_event_count,
         "likely_replaced_template_count": len(replaced_templates),
         "likely_replaced_templates_included": include_replaced_templates,
+        "schedule_reflow": {
+            "unresolved": bool(reflow_groups),
+            "groups": reflow_groups,
+            "later_gaps_are_provisional": bool(reflow_groups),
+        },
     }
     if requested_at is not None:
         result["requested_time"] = at_time
