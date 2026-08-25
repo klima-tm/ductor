@@ -143,6 +143,22 @@ def test_category_reports_source_freshness_and_unavailable_state(
             "default_time": "Window: 18:00-22:30",
             "status": "Set",
             "view": "Daily",
+            "matched_schedule_blocks": ["Lesson"],
+        }
+    ]
+    assert evidence["same_activity_groups"] == [
+        {
+            "routine": "English",
+            "schedule_block": "Lesson",
+            "other_events": [
+                {
+                    "summary": "Imported lesson",
+                    "display_start": "2026-08-27T17:30:00+07:00",
+                    "display_end": "2026-08-27T18:30:00+07:00",
+                    "is_recurring_calendar_event": False,
+                    "calendar_source": "non_primary",
+                }
+            ],
         }
     ]
     assert schedule["routines"][0]["Name"] == "English"

@@ -52,6 +52,12 @@ meaningful gaps from the current data rather than encoding named event titles or
 recurrence patterns as response rules. Do not surface recurrence, classification,
 or other internal metadata unless it actually helps answer the user's question.
 Keep the resolution as a natural low-stakes inference rather than a guarantee.
+When `same_activity_groups` links multiple events to the same Routine schedule
+block, treat them as possible alternative instances of one activity rather than
+automatically adding them together. A one-off non-primary event is stronger
+evidence of the concrete instance than a recurring primary-calendar template;
+infer the likely override unless the surrounding data supports genuinely
+separate occurrences.
 
 Answer the user's real social decision, not the calendar database. Lead with the
 direct availability conclusion, then include only the events or likely changes

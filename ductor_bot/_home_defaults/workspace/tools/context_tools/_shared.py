@@ -147,13 +147,72 @@ def _matching_routines(summary: str, routines: list[dict[str, Any]]) -> list[dic
         blocks = routine.get("schedule_blocks")
         if not isinstance(blocks, list):
             continue
-        if any(
-            " ".join(str(block).casefold().split()) in normalized_summary
+        matched_blocks = [
+            str(block).strip()
             for block in blocks
-            if str(block).strip()
-        ):
-            matches.append(routine)
+            if str(block).strip() and " ".join(str(block).casefold().split()) in normalized_summary
+        ]
+        if matched_blocks:
+            match = dict(routine)
+            match["matched_schedule_blocks"] = matched_blocks
+            matches.append(match)
     return matches
+
+
+def _attach_same_activity_groups(events: list[dict[str, Any]]) -> None:
+    groups: dict[tuple[str, str], list[int]] = {}
+    labels: dict[tuple[str, str], tuple[str, str]] = {}
+    for index, event in enumerate(events):
+        evidence = event.get("schedule_evidence")
+        if not isinstance(evidence, dict):
+            continue
+        routines = evidence.get("matching_routines")
+        if not isinstance(routines, list):
+            continue
+        for routine in routines:
+            if not isinstance(routine, dict):
+                continue
+            routine_name = str(routine.get("name") or "").strip()
+            blocks = routine.get("matched_schedule_blocks")
+            if not routine_name or not isinstance(blocks, list):
+                continue
+            for block in blocks:
+                block_name = str(block).strip()
+                if not block_name:
+                    continue
+                key = (routine_name.casefold(), block_name.casefold())
+                groups.setdefault(key, []).append(index)
+                labels[key] = (routine_name, block_name)
+
+    for key, indexes in groups.items():
+        unique_indexes = list(dict.fromkeys(indexes))
+        if len(unique_indexes) < 2:
+            continue
+        routine_name, block_name = labels[key]
+        for index in unique_indexes:
+            evidence = events[index]["schedule_evidence"]
+            same_activity = evidence.setdefault("same_activity_groups", [])
+            same_activity.append(
+                {
+                    "routine": routine_name,
+                    "schedule_block": block_name,
+                    "other_events": [
+                        {
+                            "summary": events[other].get("summary"),
+                            "display_start": events[other].get("display_start"),
+                            "display_end": events[other].get("display_end"),
+                            "is_recurring_calendar_event": events[other]["schedule_evidence"].get(
+                                "is_recurring_calendar_event"
+                            ),
+                            "calendar_source": events[other]["schedule_evidence"].get(
+                                "calendar_source"
+                            ),
+                        }
+                        for other in unique_indexes
+                        if other != index
+                    ],
+                }
+            )
 
 
 def get_schedule(
@@ -264,6 +323,7 @@ def get_schedule(
                 }
                 events.append(normalized_event)
     events.sort(key=lambda event: str(event.get("display_start") or ""))
+    _attach_same_activity_groups(events)
 
     routines: list[dict[str, Any]] = []
     normalized_query = " ".join((routine_query or "").split())[:200].casefold()
