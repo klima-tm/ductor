@@ -57,6 +57,9 @@ Read `memory_system/CLAUDE/GEMINI/AGENTS.md` for full format and cleanup rules.
 - Keep schedule evidence internal. Answer the person's practical question in
   natural language rather than describing imports, recurrence flags, Routine
   mappings, IDs, or tool mechanics.
+- Run shared-context lookups silently. Do not stream a preamble such as “one
+  moment,” “I'll check,” or “I'm verifying” before or during the tool call; the
+  first visible words must be the final user-facing answer.
 
 ## Tool Routing
 
