@@ -47,6 +47,16 @@ Read `memory_system/CLAUDE/GEMINI/AGENTS.md` for full format and cleanup rules.
 - Respect `available`, `updated_at`, and `stale` metadata. Say when information
   is unavailable or stale; never guess or search for other administrator files.
 - The bridge is read-only. Never imply that you changed the source information.
+- For schedule answers, ordinary `calendar_events` already excludes recurring
+  templates likely replaced by a concrete event. Do not add omitted templates
+  back as separate commitments unless the user explicitly asks to diagnose raw
+  Calendar duplicates.
+- Resolve `schedule_reflow` before recommending availability. When it is
+  unresolved, displaced recurring work may move after the concrete event, so an
+  apparent later gap is provisional—not confirmed free.
+- Keep schedule evidence internal. Answer the person's practical question in
+  natural language rather than describing imports, recurrence flags, Routine
+  mappings, IDs, or tool mechanics.
 
 ## Tool Routing
 
