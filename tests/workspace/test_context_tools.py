@@ -150,6 +150,7 @@ def test_category_reports_source_freshness_and_unavailable_state(
         {
             "routine": "English",
             "schedule_block": "Lesson",
+            "likely_alternative_instances": True,
             "other_events": [
                 {
                     "summary": "Imported lesson",
@@ -159,6 +160,13 @@ def test_category_reports_source_freshness_and_unavailable_state(
                     "calendar_source": "non_primary",
                 }
             ],
+        }
+    ]
+    assert evidence["likely_schedule_roles"] == [
+        {
+            "routine": "English",
+            "schedule_block": "Lesson",
+            "role": "recurring_template_replaced_by_concrete_instance",
         }
     ]
     assert schedule["routines"][0]["Name"] == "English"
@@ -194,6 +202,7 @@ def test_schedule_clock_query_normalizes_offsets_and_returns_all_overlaps(
     assert imported_evidence["is_recurring_calendar_event"] is False
     assert imported_evidence["calendar_source"] == "non_primary"
     assert imported_evidence["matching_routines"][0]["name"] == "English"
+    assert imported_evidence["likely_schedule_roles"][0]["role"] == "concrete_instance"
     assert shared.get_schedule("2026-08-27", "2026-08-28", at_time="17:30") == {
         "success": False,
         "error": "at_time requires one date (start_date and end_date must match)",
