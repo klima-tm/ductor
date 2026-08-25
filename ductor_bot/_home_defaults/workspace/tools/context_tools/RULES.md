@@ -74,3 +74,7 @@ template, treat the downstream template sequence as provisional rather than
 using it to claim exact availability with certainty. A calendar that still shows
 those overlaps may simply not reflect Egor's morning reconciliation yet. State
 the likely real sequence naturally; do not explain it as a technical proof.
+When `schedule_reflow.unresolved` is true, its recurring candidates lost their
+original slots to a concrete event and may be moved elsewhere. Do not call the
+period immediately after the concrete event definitely free; describe the
+likely reflow and recommend only a genuinely reliable window or a direct message.
