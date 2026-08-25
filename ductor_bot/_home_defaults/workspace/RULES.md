@@ -54,6 +54,9 @@ Read `memory_system/CLAUDE/GEMINI/AGENTS.md` for full format and cleanup rules.
 - Resolve `schedule_reflow` before recommending availability. When it is
   unresolved, displaced recurring work may move after the concrete event, so an
   apparent later gap is provisional—not confirmed free.
+- A scheduled meal, break, routine, or personal block is not “free.” It may be a
+  usable or interruptible window for a short call, but name that tradeoff instead
+  of presenting the period as unoccupied or risk-free.
 - Keep schedule evidence internal. Answer the person's practical question in
   natural language rather than describing imports, recurrence flags, Routine
   mappings, IDs, or tool mechanics.
