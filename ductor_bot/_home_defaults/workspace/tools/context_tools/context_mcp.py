@@ -29,7 +29,8 @@ _TOOLS = [
         "name": "get_schedule",
         "description": (
             "Read Egor's actual Calendar events for a bounded date range plus approved "
-            "reference routines. Calendar wins for specific dates."
+            "reference routines. Each event includes compact matching Routine and "
+            "calendar-source evidence for schedule reconstruction."
         ),
         "inputSchema": {
             "type": "object",

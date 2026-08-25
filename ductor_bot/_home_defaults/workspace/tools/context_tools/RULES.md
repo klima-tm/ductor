@@ -21,6 +21,10 @@ information honestly. Do not inspect other files or infer denied categories.
 For a specific date, trust Calendar events over a routine's `Default time`.
 Routine times and windows describe the normal structure only. The schedule tool
 already removes restricted routine rows; never speculate about omitted data.
+For ordinary dated availability, pass `--no-routines` (or
+`include_routines=false` in MCP): each Calendar event still includes compact
+`schedule_evidence` derived from matching approved Routines. Request full
+Routines only when their detailed content is actually needed.
 
 Interpret clock times only through `display_start` and `display_end` in the
 returned schedule timezone. When the user asks what happens at a specific time,
@@ -36,7 +40,10 @@ without changing the fact: for example, render a teacher stored as
 `Jerel with a J` simply as `Jerel`. Do not simplify uncertain wording.
 
 Use current event specificity, recurrence, origin, timing, approved Routines
-metadata, and known habits to infer the likely resolution. Egor usually
+evidence, and known habits to infer the likely resolution. Treat
+`schedule_evidence` as internal reasoning material, not language to expose.
+Never mention calendar plumbing, IDs, URLs, recurrence flags, or database
+classification in an ordinary availability answer. Egor usually
 reconciles that day's conflicts during the morning, so future overlaps may still
 move. A concrete booked or imported event is normally stronger evidence than an
 overlapping background routine template, while a scheduled but flexible task
