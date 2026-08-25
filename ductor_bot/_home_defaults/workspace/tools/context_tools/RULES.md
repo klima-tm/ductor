@@ -78,3 +78,5 @@ When `schedule_reflow.unresolved` is true, its recurring candidates lost their
 original slots to a concrete event and may be moved elsewhere. Do not call the
 period immediately after the concrete event definitely free; describe the
 likely reflow and recommend only a genuinely reliable window or a direct message.
+The compact result deliberately puts `schedule_reflow` before `calendar_events`;
+resolve it before reading the remaining day as a literal sequence.
