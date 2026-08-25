@@ -130,11 +130,11 @@ def test_category_reports_source_freshness_and_unavailable_state(
     schedule = shared.get_schedule("2026-08-27", "2026-08-27", include_routines=True)
     assert schedule["success"] is True
     assert schedule["available"] is True
-    assert schedule["calendar_events"][0]["summary"] == "Lesson"
+    assert schedule["calendar_events"][0]["summary"] == "Imported lesson"
     assert schedule["calendar_events"][0]["display_start"] == "2026-08-27T17:30:00+07:00"
     evidence = schedule["calendar_events"][0]["schedule_evidence"]
-    assert evidence["is_recurring_calendar_event"] is True
-    assert evidence["calendar_source"] == "primary"
+    assert evidence["is_recurring_calendar_event"] is False
+    assert evidence["calendar_source"] == "non_primary"
     assert evidence["matching_routines"] == [
         {
             "name": "English",
@@ -146,33 +146,20 @@ def test_category_reports_source_freshness_and_unavailable_state(
             "matched_schedule_blocks": ["Lesson"],
         }
     ]
-    assert evidence["same_activity_groups"] == [
-        {
-            "routine": "English",
-            "schedule_block": "Lesson",
-            "likely_alternative_instances": True,
-            "other_events": [
-                {
-                    "summary": "Imported lesson",
-                    "display_start": "2026-08-27T17:30:00+07:00",
-                    "display_end": "2026-08-27T18:30:00+07:00",
-                    "is_recurring_calendar_event": False,
-                    "calendar_source": "non_primary",
-                }
-            ],
-        }
-    ]
+    assert "same_activity_groups" not in evidence
     assert evidence["likely_schedule_roles"] == [
         {
             "routine": "English",
             "schedule_block": "Lesson",
-            "role": "recurring_template_replaced_by_concrete_instance",
+            "role": "concrete_instance",
         }
     ]
     assert schedule["routines"][0]["Name"] == "English"
     assert schedule["calendar_authoritative_for_specific_dates"] is True
     assert schedule["full_event_metadata_included"] is False
     assert "id" not in schedule["calendar_events"][0]
+    assert schedule["likely_replaced_template_count"] == 1
+    assert schedule["likely_replaced_templates_included"] is False
 
 
 def test_schedule_query_is_bounded_and_filters_by_date(context_dir: Path, snapshot: Path) -> None:
@@ -193,18 +180,27 @@ def test_schedule_clock_query_normalizes_offsets_and_returns_all_overlaps(
     result = shared.get_schedule(
         "2026-08-27", "2026-08-27", at_time="17:30", include_routines=False
     )
-    assert [event["summary"] for event in result["calendar_events"]] == [
-        "Lesson",
-        "Imported lesson",
-    ]
-    assert result["calendar_events"][1]["display_start"] == "2026-08-27T17:30:00+07:00"
+    assert [event["summary"] for event in result["calendar_events"]] == ["Imported lesson"]
+    assert result["calendar_events"][0]["display_start"] == "2026-08-27T17:30:00+07:00"
     assert result["requested_time"] == "17:30"
-    assert result["all_simultaneous_calendar_events_are_returned"] is True
-    imported_evidence = result["calendar_events"][1]["schedule_evidence"]
+    assert result["all_simultaneous_calendar_events_are_returned"] is False
+    imported_evidence = result["calendar_events"][0]["schedule_evidence"]
     assert imported_evidence["is_recurring_calendar_event"] is False
     assert imported_evidence["calendar_source"] == "non_primary"
     assert imported_evidence["matching_routines"][0]["name"] == "English"
     assert imported_evidence["likely_schedule_roles"][0]["role"] == "concrete_instance"
+    expanded = shared.get_schedule(
+        "2026-08-27",
+        "2026-08-27",
+        at_time="17:30",
+        include_routines=False,
+        include_replaced_templates=True,
+    )
+    assert [event["summary"] for event in expanded["calendar_events"]] == [
+        "Lesson",
+        "Imported lesson",
+    ]
+    assert expanded["all_simultaneous_calendar_events_are_returned"] is True
     assert shared.get_schedule("2026-08-27", "2026-08-28", at_time="17:30") == {
         "success": False,
         "error": "at_time requires one date (start_date and end_date must match)",
@@ -215,6 +211,7 @@ def test_schedule_clock_query_normalizes_offsets_and_returns_all_overlaps(
         "2026-08-27",
         include_routines=False,
         include_event_metadata=True,
+        include_replaced_templates=True,
     )
     assert full["full_event_metadata_included"] is True
     assert full["calendar_events"][0]["id"] == "event-1"
@@ -299,6 +296,7 @@ def test_mcp_lists_only_five_read_tools(context_dir: Path, snapshot: Path) -> No
     assert "start_date" in schedule_tool["inputSchema"]["properties"]
     assert "at_time" in schedule_tool["inputSchema"]["properties"]
     assert "include_event_metadata" in schedule_tool["inputSchema"]["properties"]
+    assert "include_replaced_templates" in schedule_tool["inputSchema"]["properties"]
     denied = mcp.handle_request(
         {
             "jsonrpc": "2.0",

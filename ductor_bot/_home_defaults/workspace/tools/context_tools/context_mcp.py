@@ -45,6 +45,7 @@ _TOOLS = [
                 "include_routines": {"type": "boolean", "default": False},
                 "routine_query": {"type": "string", "maxLength": 200},
                 "include_event_metadata": {"type": "boolean", "default": False},
+                "include_replaced_templates": {"type": "boolean", "default": False},
             },
             "additionalProperties": False,
         },
@@ -108,6 +109,7 @@ def handle_request(message: dict[str, Any]) -> dict[str, object] | None:
         include_routines = arguments.get("include_routines", False)
         routine_query = arguments.get("routine_query")
         include_event_metadata = arguments.get("include_event_metadata", False)
+        include_replaced_templates = arguments.get("include_replaced_templates", False)
         if (
             (start_date is not None and not isinstance(start_date, str))
             or (end_date is not None and not isinstance(end_date, str))
@@ -115,6 +117,7 @@ def handle_request(message: dict[str, Any]) -> dict[str, object] | None:
             or not isinstance(include_routines, bool)
             or (routine_query is not None and not isinstance(routine_query, str))
             or not isinstance(include_event_metadata, bool)
+            or not isinstance(include_replaced_templates, bool)
         ):
             return _error(request_id, -32602, "Invalid schedule arguments")
         payload = get_schedule(
@@ -124,6 +127,7 @@ def handle_request(message: dict[str, Any]) -> dict[str, object] | None:
             include_routines=include_routines,
             routine_query=routine_query,
             include_event_metadata=include_event_metadata,
+            include_replaced_templates=include_replaced_templates,
         )
     elif name == "search_shared_context" and isinstance(arguments.get("query"), str):
         payload = search(arguments["query"])

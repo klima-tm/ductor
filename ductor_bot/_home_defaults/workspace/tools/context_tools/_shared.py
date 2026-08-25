@@ -244,6 +244,18 @@ def _attach_same_activity_groups(events: list[dict[str, Any]]) -> None:
             )
 
 
+def _is_likely_replaced_template(event: dict[str, Any]) -> bool:
+    evidence = event.get("schedule_evidence")
+    if not isinstance(evidence, dict):
+        return False
+    roles = evidence.get("likely_schedule_roles")
+    return isinstance(roles, list) and any(
+        isinstance(role, dict)
+        and role.get("role") == "recurring_template_replaced_by_concrete_instance"
+        for role in roles
+    )
+
+
 def get_schedule(
     start_date: str | None = None,
     end_date: str | None = None,
@@ -252,6 +264,7 @@ def get_schedule(
     include_routines: bool = False,
     routine_query: str | None = None,
     include_event_metadata: bool = False,
+    include_replaced_templates: bool = False,
 ) -> dict[str, Any]:
     """Return a bounded date slice plus the approved reference routines."""
 
@@ -361,6 +374,14 @@ def get_schedule(
                 events.append(normalized_event)
     events.sort(key=lambda event: str(event.get("display_start") or ""))
     _attach_same_activity_groups(events)
+    source_event_count = len(events)
+    replaced_templates = [event for event in events if _is_likely_replaced_template(event)]
+    if not include_replaced_templates:
+        events = [event for event in events if not _is_likely_replaced_template(event)]
+        for event in events:
+            evidence = event.get("schedule_evidence")
+            if isinstance(evidence, dict):
+                evidence.pop("same_activity_groups", None)
 
     routines: list[dict[str, Any]] = []
     normalized_query = " ".join((routine_query or "").split())[:200].casefold()
@@ -386,9 +407,15 @@ def get_schedule(
         "routines": routines,
         "calendar_authoritative_for_specific_dates": True,
         "routine_times_are_reference_only": True,
-        "all_simultaneous_calendar_events_are_returned": True,
+        "all_simultaneous_calendar_events_are_returned": (
+            include_replaced_templates or not replaced_templates
+        ),
+        "all_probable_active_calendar_events_are_returned": True,
         "use_display_start_and_display_end_for_clock_times": True,
         "full_event_metadata_included": include_event_metadata,
+        "source_calendar_event_count": source_event_count,
+        "likely_replaced_template_count": len(replaced_templates),
+        "likely_replaced_templates_included": include_replaced_templates,
     }
     if requested_at is not None:
         result["requested_time"] = at_time
