@@ -249,8 +249,9 @@ def get_schedule(
     end_date: str | None = None,
     *,
     at_time: str | None = None,
-    include_routines: bool = True,
+    include_routines: bool = False,
     routine_query: str | None = None,
+    include_event_metadata: bool = False,
 ) -> dict[str, Any]:
     """Return a bounded date slice plus the approved reference routines."""
 
@@ -331,7 +332,14 @@ def get_schedule(
             else:
                 included = event_start < range_end and event_end > range_start
             if included:
-                normalized_event = dict(event)
+                if include_event_metadata:
+                    normalized_event = dict(event)
+                else:
+                    normalized_event = {
+                        key: event[key]
+                        for key in ("summary", "status", "location")
+                        if event.get(key) not in (None, "")
+                    }
                 normalized_event["display_start"] = event_start.isoformat()
                 normalized_event["display_end"] = event_end.isoformat()
                 normalized_event["display_timezone"] = timezone_name
@@ -356,7 +364,7 @@ def get_schedule(
 
     routines: list[dict[str, Any]] = []
     normalized_query = " ".join((routine_query or "").split())[:200].casefold()
-    if include_routines:
+    if include_routines or normalized_query:
         for routine in routine_records:
             if (
                 normalized_query
@@ -380,6 +388,7 @@ def get_schedule(
         "routine_times_are_reference_only": True,
         "all_simultaneous_calendar_events_are_returned": True,
         "use_display_start_and_display_end_for_clock_times": True,
+        "full_event_metadata_included": include_event_metadata,
     }
     if requested_at is not None:
         result["requested_time"] = at_time

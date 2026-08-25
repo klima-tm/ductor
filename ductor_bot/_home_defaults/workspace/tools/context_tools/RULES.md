@@ -21,10 +21,11 @@ information honestly. Do not inspect other files or infer denied categories.
 For a specific date, trust Calendar events over a routine's `Default time`.
 Routine times and windows describe the normal structure only. The schedule tool
 already removes restricted routine rows; never speculate about omitted data.
-For ordinary dated availability, pass `--no-routines` (or
-`include_routines=false` in MCP): each Calendar event still includes compact
-`schedule_evidence` derived from matching approved Routines. Request full
-Routines only when their detailed content is actually needed.
+Ordinary calls are compact by default: each Calendar event includes the matched
+approved Routine evidence, while full Routine bodies and provider metadata stay
+hidden. Request `--with-routines`/`include_routines=true`, a `routine_query`, or
+`--full-event-metadata`/`include_event_metadata=true` only when those details are
+actually needed.
 
 Interpret clock times only through `display_start` and `display_end` in the
 returned schedule timezone. When the user asks what happens at a specific time,

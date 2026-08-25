@@ -42,8 +42,9 @@ _TOOLS = [
                     "description": "Optional clock time in the schedule display timezone (HH:MM).",
                     "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
                 },
-                "include_routines": {"type": "boolean", "default": True},
+                "include_routines": {"type": "boolean", "default": False},
                 "routine_query": {"type": "string", "maxLength": 200},
+                "include_event_metadata": {"type": "boolean", "default": False},
             },
             "additionalProperties": False,
         },
@@ -104,14 +105,16 @@ def handle_request(message: dict[str, Any]) -> dict[str, object] | None:
         start_date = arguments.get("start_date")
         end_date = arguments.get("end_date")
         at_time = arguments.get("at_time")
-        include_routines = arguments.get("include_routines", True)
+        include_routines = arguments.get("include_routines", False)
         routine_query = arguments.get("routine_query")
+        include_event_metadata = arguments.get("include_event_metadata", False)
         if (
             (start_date is not None and not isinstance(start_date, str))
             or (end_date is not None and not isinstance(end_date, str))
             or (at_time is not None and not isinstance(at_time, str))
             or not isinstance(include_routines, bool)
             or (routine_query is not None and not isinstance(routine_query, str))
+            or not isinstance(include_event_metadata, bool)
         ):
             return _error(request_id, -32602, "Invalid schedule arguments")
         payload = get_schedule(
@@ -120,6 +123,7 @@ def handle_request(message: dict[str, Any]) -> dict[str, object] | None:
             at_time=at_time,
             include_routines=include_routines,
             routine_query=routine_query,
+            include_event_metadata=include_event_metadata,
         )
     elif name == "search_shared_context" and isinstance(arguments.get("query"), str):
         payload = search(arguments["query"])
