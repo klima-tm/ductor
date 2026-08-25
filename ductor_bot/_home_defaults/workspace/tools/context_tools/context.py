@@ -27,6 +27,7 @@ def main() -> None:
     routine_mode.add_argument("--no-routines", action="store_true")
     parser.add_argument("--routine-query")
     parser.add_argument("--full-event-metadata", action="store_true")
+    parser.add_argument("--include-replaced-templates", action="store_true")
     args = parser.parse_args()
     if args.command == "search":
         result = search(" ".join(args.query))
@@ -38,6 +39,7 @@ def main() -> None:
             include_routines=args.with_routines and not args.no_routines,
             routine_query=args.routine_query,
             include_event_metadata=args.full_event_metadata,
+            include_replaced_templates=args.include_replaced_templates,
         )
     else:
         result = get_category(_COMMANDS[args.command])

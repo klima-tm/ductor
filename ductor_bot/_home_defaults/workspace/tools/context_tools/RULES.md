@@ -26,6 +26,10 @@ approved Routine evidence, while full Routine bodies and provider metadata stay
 hidden. Request `--with-routines`/`include_routines=true`, a `routine_query`, or
 `--full-event-metadata`/`include_event_metadata=true` only when those details are
 actually needed.
+Likely replaced recurring templates are excluded from ordinary
+`calendar_events`. If the user explicitly asks why raw Calendar entries look
+duplicated, rerun with `--include-replaced-templates` or
+`include_replaced_templates=true`; do not enable it for normal availability.
 
 Interpret clock times only through `display_start` and `display_end` in the
 returned schedule timezone. When the user asks what happens at a specific time,
