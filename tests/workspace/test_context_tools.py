@@ -127,7 +127,7 @@ def test_category_reports_source_freshness_and_unavailable_state(
     assert goals["stale"] is True
     assert "warning" in goals
 
-    schedule = shared.get_schedule("2026-08-27", "2026-08-27")
+    schedule = shared.get_schedule("2026-08-27", "2026-08-27", include_routines=True)
     assert schedule["success"] is True
     assert schedule["available"] is True
     assert schedule["calendar_events"][0]["summary"] == "Lesson"
@@ -171,6 +171,8 @@ def test_category_reports_source_freshness_and_unavailable_state(
     ]
     assert schedule["routines"][0]["Name"] == "English"
     assert schedule["calendar_authoritative_for_specific_dates"] is True
+    assert schedule["full_event_metadata_included"] is False
+    assert "id" not in schedule["calendar_events"][0]
 
 
 def test_schedule_query_is_bounded_and_filters_by_date(context_dir: Path, snapshot: Path) -> None:
@@ -207,6 +209,15 @@ def test_schedule_clock_query_normalizes_offsets_and_returns_all_overlaps(
         "success": False,
         "error": "at_time requires one date (start_date and end_date must match)",
     }
+
+    full = shared.get_schedule(
+        "2026-08-27",
+        "2026-08-27",
+        include_routines=False,
+        include_event_metadata=True,
+    )
+    assert full["full_event_metadata_included"] is True
+    assert full["calendar_events"][0]["id"] == "event-1"
     assert shared.get_schedule("2026-08-27", "2026-08-27", at_time="5pm") == {
         "success": False,
         "error": "at_time must use HH:MM",
@@ -287,6 +298,7 @@ def test_mcp_lists_only_five_read_tools(context_dir: Path, snapshot: Path) -> No
     )
     assert "start_date" in schedule_tool["inputSchema"]["properties"]
     assert "at_time" in schedule_tool["inputSchema"]["properties"]
+    assert "include_event_metadata" in schedule_tool["inputSchema"]["properties"]
     denied = mcp.handle_request(
         {
             "jsonrpc": "2.0",

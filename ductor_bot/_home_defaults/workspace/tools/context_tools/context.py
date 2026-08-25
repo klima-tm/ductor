@@ -22,8 +22,11 @@ def main() -> None:
     parser.add_argument("--start")
     parser.add_argument("--end")
     parser.add_argument("--at")
-    parser.add_argument("--no-routines", action="store_true")
+    routine_mode = parser.add_mutually_exclusive_group()
+    routine_mode.add_argument("--with-routines", action="store_true")
+    routine_mode.add_argument("--no-routines", action="store_true")
     parser.add_argument("--routine-query")
+    parser.add_argument("--full-event-metadata", action="store_true")
     args = parser.parse_args()
     if args.command == "search":
         result = search(" ".join(args.query))
@@ -32,8 +35,9 @@ def main() -> None:
             args.start,
             args.end,
             at_time=args.at,
-            include_routines=not args.no_routines,
+            include_routines=args.with_routines and not args.no_routines,
             routine_query=args.routine_query,
+            include_event_metadata=args.full_event_metadata,
         )
     else:
         result = get_category(_COMMANDS[args.command])
