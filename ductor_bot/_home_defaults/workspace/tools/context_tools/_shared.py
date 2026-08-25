@@ -315,6 +315,31 @@ def _schedule_reflow_groups(events: list[dict[str, Any]]) -> list[dict[str, Any]
     return groups
 
 
+def _compact_event_evidence(events: list[dict[str, Any]]) -> None:
+    for event in events:
+        evidence = event.get("schedule_evidence")
+        if not isinstance(evidence, dict):
+            continue
+        compact: dict[str, Any] = {
+            "is_recurring_calendar_event": evidence.get("is_recurring_calendar_event"),
+            "calendar_source": evidence.get("calendar_source"),
+        }
+        roles = evidence.get("likely_schedule_roles")
+        if isinstance(roles, list) and roles:
+            compact["likely_schedule_roles"] = roles
+            routines = evidence.get("matching_routines")
+            if isinstance(routines, list):
+                compact["matching_routines"] = [
+                    {
+                        "name": routine.get("name"),
+                        "matched_schedule_blocks": routine.get("matched_schedule_blocks", []),
+                    }
+                    for routine in routines
+                    if isinstance(routine, dict) and routine.get("name")
+                ]
+        event["schedule_evidence"] = compact
+
+
 def get_schedule(
     start_date: str | None = None,
     end_date: str | None = None,
@@ -454,6 +479,12 @@ def get_schedule(
                 continue
             routines.append(routine)
 
+    detailed_evidence = bool(
+        include_routines or normalized_query or include_event_metadata or include_replaced_templates
+    )
+    if not detailed_evidence:
+        _compact_event_evidence(events)
+
     result: dict[str, Any] = {
         "success": True,
         "category": "schedule",
@@ -463,6 +494,13 @@ def get_schedule(
         "stale": _stale(entry),
         "timezone": timezone_name,
         "date_range": {"start": start.isoformat(), "end": end.isoformat()},
+        "schedule_reflow": {
+            "unresolved": bool(reflow_groups),
+            "groups": reflow_groups,
+            "later_gaps_are_provisional": bool(reflow_groups),
+        },
+        "likely_replaced_template_count": len(replaced_templates),
+        "likely_replaced_templates_included": include_replaced_templates,
         "calendar_events": events,
         "routines": routines,
         "calendar_authoritative_for_specific_dates": True,
@@ -474,13 +512,6 @@ def get_schedule(
         "use_display_start_and_display_end_for_clock_times": True,
         "full_event_metadata_included": include_event_metadata,
         "source_calendar_event_count": source_event_count,
-        "likely_replaced_template_count": len(replaced_templates),
-        "likely_replaced_templates_included": include_replaced_templates,
-        "schedule_reflow": {
-            "unresolved": bool(reflow_groups),
-            "groups": reflow_groups,
-            "later_gaps_are_provisional": bool(reflow_groups),
-        },
     }
     if requested_at is not None:
         result["requested_time"] = at_time
